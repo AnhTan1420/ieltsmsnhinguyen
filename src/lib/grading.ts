@@ -1,5 +1,4 @@
 import OpenAI from "openai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GradingFeedback } from "@/lib/types";
 
 const SYSTEM_PROMPT = `You are an official IELTS Writing examiner. Grade the given essay strictly against
@@ -18,39 +17,27 @@ Lexical Resource, Grammatical Range and Accuracy). Respond ONLY with a JSON obje
   "examiner_summary": string
 }`;
 
-async function gradeWithOpenAI(content: string, testPrompt: string): Promise<GradingFeedback> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL ?? "gpt-4o-mini",
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Prompt: ${testPrompt}\n\nEssay: ${content}` },
-    ],
-  });
-  return JSON.parse(completion.choices[0]?.message.content || "{}");
-}
+// Khởi tạo client OpenAI nhưng trỏ đường dẫn về máy chủ của Groq
+const groq = new OpenAI({ 
+  apiKey: process.env.GROQ_API_KEY, 
+  baseURL: "https://api.groq.com/openai/v1" 
+});
 
-async function gradeWithGemini(content: string, testPrompt: string): Promise<GradingFeedback> {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    systemInstruction: SYSTEM_PROMPT,
-    generationConfig: { responseMimeType: "application/json" },
-  });
-  const result = await model.generateContent(`Prompt: ${testPrompt}\n\nEssay: ${content}`);
-  return JSON.parse(result.response.text());
-}
-
-/**
- * Grades an essay, trying OpenAI first and falling back to Gemini.
- * Throws if both providers fail.
- */
 export async function gradeSubmission(content: string, testPrompt: string): Promise<GradingFeedback> {
   try {
-    return await gradeWithOpenAI(content, testPrompt);
-  } catch (openAiError) {
-    console.warn("OpenAI grading failed, falling back to Gemini:", openAiError);
-    return await gradeWithGemini(content, testPrompt);
+    const completion = await groq.chat.completions.create({
+      // Llama 3 70B là mô hình rất thông minh của Meta, được Groq hỗ trợ chạy miễn phí
+      model: "llama3-70b-8192", 
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: `Prompt: ${testPrompt}\n\nEssay: ${content}` },
+      ],
+    });
+
+    return JSON.parse(completion.choices[0]?.message.content || "{}");
+  } catch (error) {
+    console.error("Lỗi khi chấm bài bằng Groq:", error);
+    throw new Error("Hệ thống chấm điểm AI đang bận. Vui lòng thử lại sau.");
   }
 }
