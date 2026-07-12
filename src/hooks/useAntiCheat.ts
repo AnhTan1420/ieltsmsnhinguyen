@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const MAX_WARNINGS = 3;
+// Cập nhật số lần cảnh cáo tối đa lên 5
+const MAX_WARNINGS = 5;
 
 type AntiCheatReason = "tab_hidden" | "window_blur" | "fullscreen_exit";
 
@@ -42,6 +43,7 @@ export function useAntiCheat({
       }
 
       const now = Date.now();
+      // Tránh việc spam API nếu các sự kiện nổ ra quá gần nhau (1.2s)
       if (now - lastReasonAtRef.current < 1200) {
         return;
       }
@@ -63,7 +65,9 @@ export function useAntiCheat({
         setWarnings(data.warningCount);
         onWarning?.(data.warningCount, reason);
 
-        if (data.status === "disqualified") {
+        // Frontend tự động khóa nếu số lần cảnh cáo đạt mức MAX_WARNINGS (5 lần)
+        // hoặc khi backend trả về status disqualified
+        if (data.status === "disqualified" || data.warningCount >= MAX_WARNINGS) {
           setIsLocked(true);
           onDisqualified();
         }
@@ -83,7 +87,7 @@ export function useAntiCheat({
       }
     };
 
-    // Kích hoạt chế độ bỏ qua phạt blur trong thời gian ngắn (300ms)
+    // Kích hoạt chế độ bỏ qua phạt blur trong 300ms khi dùng copy/paste/chuột phải
     const triggerBypass = () => {
       bypassBlurRef.current = true;
       setTimeout(() => {
@@ -92,7 +96,7 @@ export function useAntiCheat({
     };
 
     const handleBlur = () => {
-      // Đặt một timeout nhỏ để đảm bảo trạng thái bypassBlurRef được cập nhật chính xác
+      // Đặt timeout 50ms để đồng bộ hóa chính xác với thời điểm bypassBlurRef bật lên
       setTimeout(() => {
         if (document.visibilityState === "visible" && !bypassBlurRef.current) {
           void reportViolation("window_blur");
@@ -110,13 +114,13 @@ export function useAntiCheat({
       }
     };
 
-    // Các sự kiện chính
+    // Lắng nghe các sự kiện cửa sổ
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
     window.addEventListener("blur", handleBlur);
     window.addEventListener("focus", handleFocus);
 
-    // Lắng nghe các sự kiện copy, paste và chuột phải để bật bypass
+    // Lắng nghe các sự kiện copy, paste và menu chuột phải để cho phép người dùng thao tác
     window.addEventListener("contextmenu", triggerBypass);
     window.addEventListener("copy", triggerBypass);
     window.addEventListener("paste", triggerBypass);
