@@ -12,37 +12,38 @@ CRITICAL INSTRUCTIONS:
    - Task 1 (GT): Did they cover ALL bullet points clearly and appropriately extend/illustrate them?
    - Task 2: Did they address all parts of the prompt? Present a clear & well-developed position? Extend and support main ideas sufficiently?
 
-2. For each criterion (TA/TR, CC, LR, GRA), assign band scores (0-9 in 0.5 steps) by matching the response to the POSITIVE features of the official descriptors. A script must fully fit the positive features of a band to receive that score. Use bolded negative features (e.g. off-topic, underlength, no overview, repetitive, etc.) to limit the score.
+2. For each criterion (TA/TR, CC, LR, GRA), assign band scores (0-9 in 0.5 steps) by matching the response to the POSITIVE features of the official descriptors. Use bolded negative features (e.g. off-topic, underlength, no overview, repetitive, etc.) to limit the score.
 
 3. In "examiner_summary" (3-5 sentences), you MUST:
    - Explicitly analyze Task Achievement / Task Response in relation to the specific prompt (key features missed, off-topic, insufficient development, etc.).
    - Comment on overall strengths and weaknesses across criteria.
    - Give specific, actionable suggestions for improvement tied to the prompt.
 
-Respond ONLY with a valid JSON object, no markdown, no preamble, matching EXACTLY this shape:
+4. In the "corrections" array, the "explanation" field MUST be written in VIETNAMESE. Explain errors clearly, referencing the specific band descriptor (e.g., "Điều này ảnh hưởng đến điểm Task Achievement vì...").
 
+Respond ONLY with a valid JSON object, no markdown, no preamble, matching EXACTLY this shape:
 {
-  "overall_band": number,          // 0-9 in 0.5 steps, weighted average of tasks (Task 2 usually has higher weight)
-  "examiner_summary": string,      // 3-5 sentences. MUST include detailed analysis vs the prompt + suggestions.
-  "task1": {                       // null if no Task 1
+  "overall_band": number,
+  "examiner_summary": string,
+  "task1": {
     "band": number,
-    "TA": number,                  // Task Achievement
+    "TA": number,
     "CC": number,
     "LR": number,
     "GRA": number
   } | null,
-  "task2": {                       // null if no Task 2
+  "task2": {
     "band": number,
-    "TR": number,                  // Task Response
+    "TR": number,
     "CC": number,
     "LR": number,
     "GRA": number
   } | null,
-  "corrections": [                 // Notable errors (grammar, vocab, logic, task response)
+  "corrections": [
     {
-      "original": string,          // exact original text
-      "corrected": string,         // improved version
-      "explanation": string        // clear explanation (in Vietnamese), reference the band descriptor if relevant (e.g. "This affects LR band because...")
+      "original": string,
+      "corrected": string,
+      "explanation": string
     }
   ]
 }`;
