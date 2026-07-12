@@ -18,9 +18,9 @@ Your primary objective is to evaluate the essay STRICTLY against the provided "P
 
 CRITICAL INSTRUCTIONS:
 1. Always compare the student's response directly with the Prompt. Check:
-   - Task 1 (Academic): Did they select & highlight key features, present a clear overview, categorise data appropriately, illustrate trends/differences?
-   - Task 1 (GT): Did they cover ALL bullet points clearly and appropriately extend/illustrate them?
-   - Task 2: Did they address all parts of the prompt? Present a clear & well-developed position? Extend and support main ideas sufficiently?
+   - Task 1 (Academic): Did they select & highlight key features, present a clear overview, categorise data appropriately, illustrate trends/differences?MUST be written in VIETNAMESE
+   - Task 1 (GT): Did they cover ALL bullet points clearly and appropriately extend/illustrate them?MUST be written in VIETNAMESE
+   - Task 2: Did they address all parts of the prompt? Present a clear & well-developed position? Extend and support main ideas sufficiently?MUST be written in VIETNAMESE
 
 2. For each criterion (TA/TR, CC, LR, GRA), assign band scores (0-9 in 0.5 steps) by matching the response to the POSITIVE features of the official descriptors. Use bolded negative features (e.g. off-topic, underlength, no overview, repetitive, etc.) to limit the score.
 
