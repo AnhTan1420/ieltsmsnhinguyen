@@ -364,6 +364,15 @@ export default function TeacherDashboard() {
                         </span>
                       )}
                     </label>
+                     <button
+                      onClick={() =>
+                        handleDownloadDoc(selectedSubmission.student_name, selectedSubmission.content ?? "")
+                      }
+                      disabled={!selectedSubmission.content}
+                      className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
+                    >
+                      <FileDown className="h-4 w-4" /> Tải file DOC
+                    </button>
                     <div className="whitespace-pre-wrap font-serif text-[15px] leading-8 bg-slate-50 border border-slate-200 rounded-2xl p-6 max-h-[420px] overflow-auto">
                       {selectedSubmission.content?.trim() || "Học sinh chưa nhập nội dung nào..."}
                     </div>
@@ -381,15 +390,7 @@ export default function TeacherDashboard() {
 
                     {selectedSubmission.feedback && <FeedbackExport submission={selectedSubmission} />}
 
-                    <button
-                      onClick={() =>
-                        handleDownloadDoc(selectedSubmission.student_name, selectedSubmission.content ?? "")
-                      }
-                      disabled={!selectedSubmission.content}
-                      className="flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-500 disabled:opacity-50"
-                    >
-                      <FileDown className="h-4 w-4" /> Tải file DOC
-                    </button>
+                   
 
                     <button
                       onClick={() => handleDeleteSubmission(selectedSubmission)}
