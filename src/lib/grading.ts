@@ -19,7 +19,7 @@ CRITICAL INSTRUCTIONS:
 3. In "examiner_summary" (3-5 sentences), you MUST:
    - Explicitly analyze Task Achievement / Task Response in relation to the specific prompt (key features missed, off-topic, insufficient development, etc.).
    - Comment on overall strengths and weaknesses across criteria.
-   - Give specific, actionable suggestions for improvement tied to the prompt.
+   - Give specific, actionable suggestions for improvement tied to the prompt. (MUST be written in ENGLISH)
 
 4. In the "corrections" array, the "explanation" field MUST be written in VIETNAMESE. Explain errors clearly, referencing the specific band descriptor (e.g., "Điều này ảnh hưởng đến điểm Task Achievement vì...").
 
