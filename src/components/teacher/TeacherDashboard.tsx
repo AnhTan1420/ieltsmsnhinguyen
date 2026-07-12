@@ -37,7 +37,7 @@ const statusStyles: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   in_progress: "Đang làm bài",
   completed: "Đã nộp",
-  disqualified: "Bị loại",
+  disqualified: "Hủy bài làm",
 };
 
 // Nâng cấp: Export File DOC đính kèm luôn cả Feedback của AI nếu có
