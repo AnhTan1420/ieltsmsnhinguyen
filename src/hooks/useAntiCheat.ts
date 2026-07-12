@@ -47,7 +47,7 @@ export function useAntiCheat({
       // Debounce: 1000ms (1 second) to prevent rapid warnings from the same action
       // Also prevent duplicate warnings for the same reason within the debounce period
       const now = Date.now();
-      if (now - lastViolationTimeRef.current < 1000) {
+      if (now - lastViolationTimeRef.current < 2000) {
         return;
       }
       lastViolationTimeRef.current = now;
@@ -123,7 +123,7 @@ export function useAntiCheat({
         if (document.visibilityState === "visible" && !bypassBlurRef.current && !isTabSwitchingRef.current) {
           void reportViolationRef.current?.("window_blur");
         }
-      }, 300);
+      }, 1000);
     };
 
     const handleFocus = () => {
