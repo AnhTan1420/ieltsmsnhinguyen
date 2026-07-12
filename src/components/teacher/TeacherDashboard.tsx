@@ -446,7 +446,7 @@ export default function TeacherDashboard() {
                       </span>
                       {submission.warning_count > 0 && (
                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                          <ShieldAlert className="h-3 w-3" /> {submission.warning_count}/3
+                          <ShieldAlert className="h-3 w-3" /> {submission.warning_count}/5
                         </span>
                       )}
                       {submission.band_score != null && (
