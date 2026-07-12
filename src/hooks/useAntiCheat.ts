@@ -25,7 +25,8 @@ export function useAntiCheat({
   const [isLocked, setIsLocked] = useState(false);
   const reportingRef = useRef(false);
   const lastReasonAtRef = useRef(0);
-  
+  const reportViolationRef = useRef<((reason: AntiCheatReason) => Promise<void>) | null>(null);
+
   const bypassBlurRef = useRef(false);
   const bypassTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -39,24 +40,24 @@ export function useAntiCheat({
     async (reason: AntiCheatReason) => {
       if (!enabled || !submissionId || isLocked) return;
 
+      // Store the latest function in ref for event handlers
+      reportViolationRef.current = reportViolation;
+
       // Immediately increment local warning count (no rate limit for UI)
-      setWarnings(prev => {
-        const newCount = prev + 1;
-        // Check if reached limit locally
-        if (newCount >= MAX_WARNINGS) {
-          setIsLocked(true);
-          onDisqualified();
-        }
-        onWarning?.(newCount, reason);
-        return newCount;
-      });
+      const newLocalCount = warnings + 1;
+      setWarnings(newLocalCount);
+      onWarning?.(newLocalCount, reason);
 
-      // Rate limit API calls to prevent spam (max 1 per 500ms)
-      const now = Date.now();
-      if (now - lastReasonAtRef.current < 500) return;
+      // Check if reached limit locally
+      if (newLocalCount >= MAX_WARNINGS) {
+        setIsLocked(true);
+        onDisqualified();
+        // Still try to sync with backend
+      }
 
+      // Send to backend (no rate limit to ensure all warnings are saved)
+      if (reportingRef.current) return;
       reportingRef.current = true;
-      lastReasonAtRef.current = now;
 
       try {
         const response = await fetch(`/api/submissions/${submissionId}/warning`, {
@@ -73,7 +74,8 @@ export function useAntiCheat({
         const data = (await response.json()) as { warningCount: number; status: string };
 
         // Sync with backend count if different
-        if (data.warningCount !== warnings + 1) {
+        // Note: warnings state may be tagged, so we use the backend's value as source of truth
+        if (data.warningCount !== newLocalCount) {
           setWarnings(data.warningCount);
           if (data.warningCount >= MAX_WARNINGS) {
             setIsLocked(true);
@@ -95,9 +97,10 @@ export function useAntiCheat({
 
   useEffect(() => {
     if (!enabled) return;
+    reportViolationRef.current = reportViolation;
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") void reportViolation("tab_hidden");
+      if (document.visibilityState === "hidden") void reportViolationRef.current?.("tab_hidden");
     };
 
     // Hàm bỏ qua cảnh cáo tạm thời (Bypass)
@@ -113,7 +116,7 @@ export function useAntiCheat({
     const handleBlur = () => {
       setTimeout(() => {
         if (document.visibilityState === "visible" && !bypassBlurRef.current) {
-          void reportViolation("window_blur");
+          void reportViolationRef.current?.("window_blur");
         }
       }, 100);
     };
@@ -124,7 +127,7 @@ export function useAntiCheat({
 
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement && document.visibilityState === "visible") {
-        void reportViolation("fullscreen_exit");
+        void reportViolationRef.current?.("fullscreen_exit");
       }
     };
 
