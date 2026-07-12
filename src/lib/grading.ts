@@ -42,7 +42,7 @@ Respond ONLY with a valid JSON object, no markdown, no preamble, matching EXACTL
     {
       "original": string,          // exact original text
       "corrected": string,         // improved version
-      "explanation": string        // clear explanation in Vietnamese, reference the band descriptor if relevant (e.g. "This affects LR band because...")
+      "explanation": string        // clear explanation (in Vietnamese), reference the band descriptor if relevant (e.g. "This affects LR band because...")
     }
   ]
 }`;
