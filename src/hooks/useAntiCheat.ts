@@ -47,9 +47,9 @@ export function useAntiCheat({
       // Store the latest function in ref for event handlers
       reportViolationRef.current = reportViolation;
 
-      // Debounce: wait 200ms to group rapid events (tab switch fires blur + visibilitychange)
+      // Debounce: wait 100ms to group blur + visibilitychange events (fire ~50ms apart)
       const now = Date.now();
-      if (now - lastViolationTimeRef.current < 200) {
+      if (now - lastViolationTimeRef.current < 100) {
         isProcessingViolationRef.current = false;
         return;
       }
@@ -60,11 +60,7 @@ export function useAntiCheat({
       setWarnings(newLocalCount);
       onWarning?.(newLocalCount, reason);
 
-      // Check if reached limit locally
-      if (newLocalCount >= MAX_WARNINGS) {
-        setIsLocked(true);
-        onDisqualified();
-      }
+      // Check if reached limit locally (but don't call onDisqualified yet - wait for API)
 
       // Send to backend - allow all warnings to be saved
       // Note: Backend handles warning_count atomically, so overlapping calls are safe
@@ -84,17 +80,12 @@ export function useAntiCheat({
         const data = (await response.json()) as { warningCount: number; status: string };
 
         // Sync with backend count if different
-        // Note: warnings state may be tagged, so we use the backend's value as source of truth
         if (data.warningCount !== newLocalCount) {
           setWarnings(data.warningCount);
-          if (data.warningCount >= MAX_WARNINGS) {
-            setIsLocked(true);
-            onDisqualified();
-          }
         }
 
-        // If backend says disqualified, ensure UI reflects it
-        if (data.status === "disqualified") {
+        // Call onDisqualified after API succeeds (to avoid race condition with PATCH request)
+        if (data.status === "disqualified" || newLocalCount >= MAX_WARNINGS) {
           setIsLocked(true);
           onDisqualified();
         }

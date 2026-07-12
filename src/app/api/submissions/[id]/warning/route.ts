@@ -35,6 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const disqualified = nextCount >= MAX_WARNINGS;
 
   // Try to insert warning record (non-blocking - don't fail if it fails)
+  // Note: This is for audit only, failures are silently ignored
   try {
     await supabaseAdmin.from("warnings").insert({
       submission_id: id,
@@ -45,6 +46,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // ignore insert failures
   }
 
+  // Update submission with new warning count and status
+  // This is the critical update - must succeed
   const { error: updateError } = await supabaseAdmin
     .from("submissions")
     .update({
@@ -56,6 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     .eq("id", id);
 
   if (updateError) {
+    console.error('Failed to update warning count:', updateError);
     return NextResponse.json({ error: updateError.message }, { status: 500 });
   }
 
