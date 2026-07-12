@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const MAX_WARNINGS = 3;
+const MAX_WARNINGS = 5;
 
 type AntiCheatReason = "tab_hidden" | "window_blur" | "fullscreen_exit";
 
