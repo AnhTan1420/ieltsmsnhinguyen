@@ -2,12 +2,7 @@ import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GradingFeedback } from "@/lib/types";
 // Hàm lọc sạch nội dung bài làm (Loại bỏ các dòng metadata)
-function cleanEssayContent(content: string): string {
-  // Regex này sẽ tìm và xóa các dòng chứa:
-  // 1. === THÔNG TIN HỌC SINH ===
-  // 2. Họ và tên: ...
-  // 3. ID, Lớp, hoặc bất kỳ label thông tin cá nhân nào
- 
+
 
 const SYSTEM_PROMPT = `You are a strict and official IELTS Writing examiner with deep knowledge of the official IELTS Writing Band Descriptors (British Council, IDP, Cambridge - updated May 2023).
 
