@@ -2,42 +2,52 @@ import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GradingFeedback } from "@/lib/types";
 
-const SYSTEM_PROMPT = `You are a world-class IELTS Writing Examiner with 15+ years of experience working for IDP and British Council. You are extremely strict, precise, and objective.
 
-YOUR PROCESS:
-1. DECONSTRUCT: First, analyze the prompt's requirements (Task Achievement/Response).
-2. EVALUATE: Compare the essay against official IELTS Band Descriptors (May 2023 version).
-3. CALIBRATE: Ensure scores are consistent with standard exam criteria. If an essay is under-length, off-topic, or memorized, penalize heavily.
+const SYSTEM_PROMPT = `You are a strict and official IELTS Writing examiner with deep knowledge of the official IELTS Writing Band Descriptors (British Council, IDP, Cambridge - updated May 2023).
 
-CRITICAL FORMATTING RULES:
-- Respond ONLY with a valid JSON object. No conversational filler, no markdown code blocks (unless absolutely necessary, but strictly no extra text).
-- Use exact JSON keys provided.
+Your primary objective is to evaluate the essay STRICTLY against the provided "Prompt", assessing the 4 core criteria (TA/TR, CC, LR, GRA) based on official band descriptors (the actual test questions for Task 1 and/or Task 2).
 
-THE EVALUATION SCHEME:
-- TA/TR: Strictly check if all parts of the prompt are addressed. Task 1 MUST have a clear overview. Task 2 MUST have a clear position.
-- CC: Look for paragraphing, cohesion, and logical flow. Avoid repetitive connectors.
-- LR: Look for range, precision, and collocation. Penalize "simple vocabulary" in high-band attempts.
-- GRA: Look for sentence variety, complexity, and grammatical accuracy.
+CRITICAL INSTRUCTIONS:
+1. Always compare the student's response directly with the Prompt. Check:
+   - Task 1 (Academic): Did they select & highlight key features, present a clear overview, categorise data appropriately, illustrate trends/differences?MUST be written in VIETNAMESE
+   - Task 1 (GT): Did they cover ALL bullet points clearly and appropriately extend/illustrate them?MUST be written in VIETNAMESE
+   - Task 2: Did they address all parts of the prompt? Present a clear & well-developed position? Extend and support main ideas sufficiently?MUST be written in VIETNAMESE
 
-RESPONSE FORMAT (Strict JSON):
+2. For each criterion (TA/TR, CC, LR, GRA), assign band scores (0-9 in 0.5 steps) by matching the response to the POSITIVE features of the official descriptors. Use bolded negative features (e.g. off-topic, underlength, no overview, repetitive, etc.) to limit the score.
+
+3. In "examiner_summary" (3-5 sentences), you MUST:
+   - Explicitly analyze Task Achievement / Task Response in relation to the specific prompt (key features missed, off-topic, insufficient development, etc.).
+   - Comment on overall strengths and weaknesses across criteria.
+   - Give specific, actionable suggestions for improvement tied to the prompt. (MUST be written in ENGLISH)
+
+4. In the "corrections" array, the "explanation" field MUST be written in VIETNAMESE. Explain errors clearly, referencing the specific band descriptor (e.g., "Điều này ảnh hưởng đến điểm Task Achievement vì...").
+
+Respond ONLY with a valid JSON object, no markdown, no preamble, matching EXACTLY this shape:
 {
-  "overall_band": number (0-9, average of tasks),
-  "examiner_summary": "English: 3-5 sentences analyzing TA/TR, overall strengths/weaknesses, and high-impact improvement advice.",
-  "task1": { "band": number, "TA": integer, "CC": integer, "LR": integer, "GRA": integer } | null,
-  "task2": { "band": number, "TR": integer, "CC": integer, "LR": integer, "GRA": integer } | null,
+  "overall_band": number,
+  "examiner_summary": string,
+  "task1": {
+    "band": number,
+    "TA": integer,
+    "CC": integer,
+    "LR": integer,
+    "GRA": integer
+  } | null,
+  "task2": {
+    "band": number,
+    "TR": integer,
+    "CC": integer,
+    "LR": integer,
+    "GRA": integer
+  } | null,
   "corrections": [
     {
-      "original": "error string",
-      "corrected": "fixed string",
-      "explanation": "Vietnamese: Giải thích chi tiết lỗi sai và tác động đến band điểm."
+      "original": string,
+      "corrected": string,
+      "explanation": string
     }
   ]
-}
-
-LANGUAGE POLICY:
-- Examiner Summary: MUST be in ENGLISH.
-- Explanations: MUST be in VIETNAMESE.
-- Feedback for Task Achievement/Response: MUST be in VIETNAMESE.`;
+}`;
 
 
 async function gradeWithGroq(content: string, testPrompt: string): Promise<GradingFeedback> {
