@@ -263,7 +263,7 @@ async function gradeWithGroq(content: string, testPrompt: string): Promise<Gradi
  
   
   const completion = await groq.chat.completions.create({
-    model: process.env.GROQ_MODEL ?? "meta-llama/llama-4-maverick-17b-128e-instruct",
+    model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
     response_format: { type: "json_object" }, // Ép Groq trả về JSON chuẩn
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
