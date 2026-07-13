@@ -1,6 +1,8 @@
 import Groq from "groq-sdk";
-import { GoogleGenerativeAI, Type, Schema } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GradingFeedback } from "@/lib/types";
+// Hàm lọc sạch nội dung bài làm (Loại bỏ các dòng metadata)
+
 
 const SYSTEM_PROMPT = ` You are an expert and highly objective IELTS Writing Examiner with comprehensive knowledge of the official IELTS Writing Band Descriptors. Your task is to evaluate ONE IELTS essay (Task 1 Academic, Task 1 General Training, or Task 2) STRICTLY against the provided Prompt and grading criteria.
 
@@ -93,45 +95,7 @@ Use EXACTLY this schema:
 }
 `;
 
-// Cấu hình Schema cho Gemini (Thư viện @google/generative-ai cũ)
-const geminiResponseSchema: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    overall_band: { type: Type.NUMBER },
-    examiner_summary: { type: Type.STRING },
-    task_type: { 
-      type: Type.STRING, 
-      enum: ["Task 1 Academic", "Task 1 General Training", "Task 2"] 
-    },
-    criteria: {
-      type: Type.OBJECT,
-      properties: {
-        TA_TR: { type: Type.INTEGER },
-        CC: { type: Type.INTEGER },
-        LR: { type: Type.INTEGER },
-        GRA: { type: Type.INTEGER }
-      },
-      required: ["TA_TR", "CC", "LR", "GRA"]
-    },
-    corrections: {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          original: { type: Type.STRING },
-          corrected: { type: Type.STRING },
-          explanation: { type: Type.STRING }
-        },
-        required: ["original", "corrected", "explanation"]
-      }
-    }
-  },
-  required: ["overall_band", "examiner_summary", "task_type", "criteria", "corrections"]
-};
 
-/**
- * Hàm phân tích và validate dữ liệu JSON trả về từ AI để ép khớp với Type định nghĩa sẵn
- */
 function parseAIJson(text: string): GradingFeedback {
   const cleaned = text
     .replace(/```json/gi, "")
@@ -142,26 +106,22 @@ function parseAIJson(text: string): GradingFeedback {
   const end = cleaned.lastIndexOf("}");
 
   if (start === -1 || end === -1) {
-    throw new Error("AI did not return valid JSON structure.");
+    throw new Error("AI did not return valid JSON.");
   }
 
   const result = JSON.parse(cleaned.substring(start, end + 1));
 
-  // Kiểm tra tính hợp lệ của các trường cốt lõi
   if (
     typeof result.overall_band !== "number" ||
-    typeof result.examiner_summary !== "string" ||
-    !result.criteria ||
-    typeof result.criteria.TA_TR !== "number" ||
     !Array.isArray(result.corrections)
   ) {
-    throw new Error("Invalid grading response schema structure.");
+    throw new Error("Invalid grading response schema.");
   }
 
-  return result as GradingFeedback;
+  return result;
 }
 
-function buildUserPrompt(testPrompt: string, essay: string): string {
+function buildUserPrompt(testPrompt: string, essay: string) {
   return `
 IELTS Writing Evaluation
 
@@ -172,27 +132,31 @@ Student Essay:
 ${essay}
 
 Instructions:
+
 - Evaluate this essay STRICTLY according to the official IELTS Writing Band Descriptors.
 - Compare the essay directly with the question.
-- Return ONLY valid JSON matching the required schema.
+- Return ONLY valid JSON.
+- Do NOT include markdown.
+- Do NOT include explanations outside the JSON.
 `;
 }
 
 async function gradeWithGroq(content: string, testPrompt: string): Promise<GradingFeedback> {
+  // Khởi tạo Groq client
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  const userPrompt = buildUserPrompt(testPrompt, content);
 
+ 
+  
   const completion = await groq.chat.completions.create({
-    model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile", // Khuyên dùng model này nếu chạy Groq ổn định
-    response_format: { type: "json_object" }, 
+    model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
+    response_format: { type: "json_object" }, // Ép Groq trả về JSON chuẩn
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: userPrompt },
+      { role: "user", content: `Prompt: ${testPrompt}\n\nEssay: ${content}` },
     ],
   });
-
-  const rawText = completion.choices[0]?.message?.content || "{}";
-  return parseAIJson(rawText); // Đưa qua hàm parse để validate an toàn
+  
+  return JSON.parse(completion.choices[0]?.message?.content || "{}");
 }
 
 async function gradeWithGemini(content: string, testPrompt: string): Promise<GradingFeedback> {
@@ -200,32 +164,22 @@ async function gradeWithGemini(content: string, testPrompt: string): Promise<Gra
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
     systemInstruction: SYSTEM_PROMPT,
-    generationConfig: { 
-      responseMimeType: "application/json",
-      responseSchema: geminiResponseSchema // Ép cấu trúc đầu ra bằng Schema ở đây
-    },
+    generationConfig: { responseMimeType: "application/json" },
   });
-
-  const userPrompt = buildUserPrompt(testPrompt, content);
-  const result = await model.generateContent(userPrompt);
-  const rawText = result.response.text();
   
-  return parseAIJson(rawText);
+  const result = await model.generateContent(`Prompt: ${testPrompt}\n\nEssay: ${content}`);
+  return JSON.parse(result.response.text());
 }
 
 /**
- * Chấm điểm bài viết, ưu tiên gọi Groq trước, nếu lỗi sẽ tự động backup sang Gemini.
+ * Grades an essay, trying Groq first and falling back to Gemini.
+ * Throws if both providers fail.
  */
 export async function gradeSubmission(content: string, testPrompt: string): Promise<GradingFeedback> {
   try {
     return await gradeWithGroq(content, testPrompt);
   } catch (groqError) {
     console.warn("Groq grading failed, falling back to Gemini:", groqError);
-    try {
-      return await gradeWithGemini(content, testPrompt);
-    } catch (geminiError) {
-      console.error("Both Groq and Gemini failed to grade submission:", geminiError);
-      throw new Error("Grading services are currently unavailable. Please try again later.");
-    }
+    return await gradeWithGemini(content, testPrompt);
   }
 }
