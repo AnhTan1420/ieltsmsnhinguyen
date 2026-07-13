@@ -27,7 +27,7 @@ export default function Home() {
           href="/teacher" 
           className="mt-10 inline-block rounded-2xl bg-cyan-400 px-10 py-4 text-lg font-bold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.2)] transition-all hover:bg-cyan-300 hover:scale-105"
         >
-          Mở Dashboard Quản Trị 🚀
+          Mở Dashboard
         </Link>
       </div>
 
