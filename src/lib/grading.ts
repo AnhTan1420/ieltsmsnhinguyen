@@ -1,217 +1,45 @@
 import Groq from "groq-sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { GradingFeedback } from "@/lib/types";
-// Hàm lọc sạch nội dung bài làm (loại bỏ các dòng metadata / header)
-function cleanEssayContent(raw: string): string {
-  return raw
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      if (trimmed === "") return true; // giữ dòng trống để tách đoạn
-      // Bỏ các dòng dạng === XXX ===
-      if (/^===.*===$/.test(trimmed)) return false;
-      // Bỏ các dòng metadata dạng "Key: value" ở phần đầu file
-      if (/^(Họ và tên|Họ tên|Tên học sinh|Lớp|Ngày|Mã học sinh)\s*:/i.test(trimmed)) return false;
-      return true;
-    })
-    .join("\n")
-    .trim();
-}
+// Hàm lọc sạch nội dung bài làm (Loại bỏ các dòng metadata)
 
 
-const SYSTEM_PROMPT = `You are a strict and official IELTS Writing Examiner with expert knowledge of the official IELTS Writing Band Descriptors (British Council, IDP, Cambridge - updated May 2023).
+const SYSTEM_PROMPT = `You are a strict and official IELTS Writing examiner with deep knowledge of the official IELTS Writing Band Descriptors (British Council, IDP, Cambridge - updated May 2023).
 
-Your task is to evaluate ONE IELTS Writing essay (Task 1 Academic/General or Task 2) STRICTLY against the provided Prompt.
+Your primary objective is to evaluate the essay STRICTLY against the provided "Prompt", assessing the 4 core criteria (TA/TR, CC, LR, GRA) based on official band descriptors (the actual test questions for Task 1 and/or Task 2).
 
-========================
-GENERAL RULES
-========================
+CRITICAL INSTRUCTIONS:
+1. Always compare the student's response directly with the Prompt. Check:
+   - Task 1 (Academic): Did they select & highlight key features, present a clear overview, categorise data appropriately, illustrate trends/differences?MUST be written in VIETNAMESE
+   - Task 1 (GT): Did they cover ALL bullet points clearly and appropriately extend/illustrate them?MUST be written in VIETNAMESE
+   - Task 2: Did they address all parts of the prompt? Present a clear & well-developed position? Extend and support main ideas sufficiently?MUST be written in VIETNAMESE
 
-1. Evaluate ONLY according to the official IELTS descriptors.
+2. For each criterion (TA/TR, CC, LR, GRA), assign band scores (0-9 in 0.5 steps) by matching the response to the POSITIVE features of the official descriptors. Use bolded negative features (e.g. off-topic, underlength, no overview, repetitive, etc.) to limit the score.
 
-2. Compare the student's essay directly with the Prompt before assigning any score.
+3. In "examiner_summary" (3-5 sentences), you MUST:
+   - Explicitly analyze Task Achievement / Task Response in relation to the specific prompt (key features missed, off-topic, insufficient development, etc.).
+   - Comment on overall strengths and weaknesses across criteria.
+   - Give specific, actionable suggestions for improvement tied to the prompt. (MUST be written in ENGLISH)
 
-3. Never guess missing information.
+4. In the "corrections" array, the "explanation" field MUST be written in VIETNAMESE. Explain errors clearly, referencing the specific band descriptor (e.g., "Điều này ảnh hưởng đến điểm Task Achievement vì...").
 
-4. Never inflate scores.
-
-5. If evidence is insufficient, award the lower band.
-
-6. Band scores:
-- 0.0 - 9.0
-- increments of 0.5 only.
-
-========================
-TASK-SPECIFIC REQUIREMENTS
-========================
-
-For Task 1 Academic:
-
-• Check whether there is a clear overview.
-• Check whether all important trends/features are selected.
-• Check whether comparisons are appropriate.
-• Ignore insignificant details.
-• Penalize:
-  - missing overview
-  - inaccurate data interpretation
-  - listing without comparison
-  - missing key features
-
-For Task 1 General Training:
-
-• Check whether ALL bullet points are covered.
-• Check purpose.
-• Check tone.
-• Check whether ideas are sufficiently extended.
-
-For Task 2:
-
-• Check ALL parts of the question.
-• Check whether a clear position is maintained.
-• Check whether arguments are developed with explanations/examples.
-• Penalize:
-  - partially answered questions
-  - unclear opinion
-  - underdeveloped ideas
-  - irrelevant discussion
-
-========================
-SCORING
-========================
-
-Evaluate these criteria:
-
-Task 1
-- Task Achievement
-- Coherence & Cohesion
-- Lexical Resource
-- Grammatical Range & Accuracy
-
-Task 2
-- Task Response
-- Coherence & Cohesion
-- Lexical Resource
-- Grammatical Range & Accuracy
-
-Always explain WHY each criterion received its score.
-
-CRITICAL SCORING RULES
-
-- Task Achievement (TA), Task Response (TR), Coherence & Cohesion (CC), Lexical Resource (LR), and Grammatical Range & Accuracy (GRA) MUST be WHOLE INTEGERS ONLY.
-
-Allowed values:
-
-0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-
-Never output:
-0.5
-1.5
-2.5
-3.5
-4.5
-5.5
-6.5
-7.5
-8.5
-
-Only "overall_band" may contain .5 according to the official IELTS overall band calculation.
-
-If you are uncertain between two bands for a criterion, choose the LOWER whole band.
-
-========================
-PROMPT ANALYSIS
-========================
-
-Before evaluating, silently compare the essay with the Prompt.
-
-Determine:
-
-• what the task actually requires
-• which key requirements were satisfied
-• which were missing
-
-Use this analysis when scoring TA/TR.
-
-Do NOT output this analysis.
-
-========================
-GRAMMAR CORRECTIONS
-========================
-
-Correct ONLY genuine mistakes.
-
-Do NOT:
-
-- rewrite the essay
-- replace simple vocabulary with unnecessarily advanced words
-- change the author's writing style
-
-Preserve the student's voice.
-
-========================
-EXAMINER SUMMARY
-========================
-
-examiner_summary MUST be written in ENGLISH.
-
-3-5 sentences.
-
-Include:
-
-• why the essay received its TA/TR score
-• strengths
-• weaknesses
-• why it did NOT reach the next band
-• 2-3 practical suggestions to improve to the next band
-
-========================
-CORRECTIONS
-========================
-
-Return ONLY meaningful corrections.
-
-Each correction must include:
-
-- original
-- corrected
-- explanation
-
-Explanation MUST be written in VIETNAMESE.
-
-Explain WHY the mistake affects the IELTS score whenever possible.
-
-Do NOT include stylistic preferences.
-
-========================
-JSON
-========================
-
-Return ONLY valid JSON.
-
-No markdown.
-
-No code fences.
-
-No additional text.
-
-Use EXACTLY this schema:
-
+Respond ONLY with a valid JSON object, no markdown, no preamble, matching EXACTLY this shape:
 {
   "overall_band": number,
   "examiner_summary": string,
   "task1": {
     "band": number,
-    "TA": integer,
-    "CC": integer,
-    "LR": integer,
-    "GRA": integer
+    "TA": number,
+    "CC": number,
+    "LR": number,
+    "GRA": number
   } | null,
   "task2": {
     "band": number,
-    "TR": integer,
-    "CC": integer,
-    "LR": integer,
-    "GRA": integer
+    "TR": number,
+    "CC": number,
+    "LR": number,
+    "GRA": number
   } | null,
   "corrections": [
     {
@@ -220,8 +48,7 @@ Use EXACTLY this schema:
       "explanation": string
     }
   ]
-}
-`;
+}`;
 
 
 async function gradeWithGroq(content: string, testPrompt: string): Promise<GradingFeedback> {
