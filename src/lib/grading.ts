@@ -180,22 +180,37 @@ function sanitizeBands(raw: GradingFeedback): GradingFeedback {
 
 /** Pull the JSON block out of a mixed markdown+JSON response */
 function extractJson(raw: string): GradingFeedback {
-  // 1. Sửa từ lastIndexOf thành indexOf để lấy dấu { đầu tiên của chuỗi JSON
-  const start = raw.indexOf("{"); 
-  const end   = raw.lastIndexOf("}");
-  
-  if (start === -1 || end === -1) {
-    throw new Error("No JSON block found in AI response");
+  const end = raw.lastIndexOf("}");
+  if (end === -1) {
+    throw new Error("Không tìm thấy dấu đóng ngoặc nhọn '}' nào trong phản hồi của AI.");
   }
-  
+
+  let balance = 0;
+  let start = -1;
+
+  // ĐI NGƯỢC từ dấu '}' cuối cùng về đầu để tìm dấu '{' cặp với nó
+  for (let i = end; i >= 0; i--) {
+    if (raw[i] === "}") balance++;
+    if (raw[i] === "{") balance--;
+
+    // Khi balance về đúng 0, ta đã tìm được dấu { ngoài cùng của Object cha
+    if (balance === 0) {
+      start = i;
+      break;
+    }
+  }
+
+  if (start === -1) {
+    throw new Error("Không tìm thấy dấu mở ngoặc '{' tương ứng với khối JSON.");
+  }
+
   const jsonString = raw.slice(start, end + 1);
-  
+
   try {
     const parsed = JSON.parse(jsonString) as GradingFeedback;
     return sanitizeBands(parsed);
   } catch (parseError) {
-    // Thêm log này để nếu AI có viết lỗi cấu trúc JSON thì bạn vẫn nhìn thấy ở terminal
-    console.error("❌ Thất bại khi parse JSON từ AI. Chuỗi đã cắt:");
+    console.error("❌ Thất bại khi parse JSON từ AI. Chuỗi trích xuất được là:");
     console.error(jsonString);
     throw parseError;
   }
@@ -212,7 +227,7 @@ async function gradeWithGroq(
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
   const completion = await groq.chat.completions.create({
-    model:       process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
+    model:       process.env.GROQ_MODEL ?? "llama-3.3-70b-specdec",
     temperature: 0.2,
     // No response_format: json_object — response is markdown + JSON mixed
     messages: [
