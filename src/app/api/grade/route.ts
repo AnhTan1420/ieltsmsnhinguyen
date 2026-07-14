@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-// Ví dụ sửa trong file route.ts xử lý API chấm điểm
-import { gradeSubmission } from '@/lib/grading';
+import { gradeSubmission } from "@/lib/grading";
 
 export async function POST(request: Request) {
   const { submissionId, content, testPrompt } = await request.json();
