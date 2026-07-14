@@ -3,17 +3,6 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 // Ví dụ sửa trong file route.ts xử lý API chấm điểm
 import { gradeSubmission } from '@/lib/grading';
 
-export async function POST(req: Request) {
-  const body = await req.json();
-  const { content, testPrompt, taskType } = body; 
-  // taskType phải được gửi từ Client lên, hoặc lấy từ Database (ví dụ: 'task1' hoặc 'task2')
-
-  // Truyền tường minh taskType vào hàm
-  const feedback = await gradeSubmission(content, testPrompt, taskType || "task2");
-  
-  return Response.json({ feedback });
-}
-
 export async function POST(request: Request) {
   const { submissionId, content, testPrompt } = await request.json();
 
