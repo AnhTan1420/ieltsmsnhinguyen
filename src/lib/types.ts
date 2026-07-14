@@ -85,6 +85,36 @@ export interface NextBandRoadmap {
   key_focus_areas: string[];
 }
 
+// ============================================================
+// SubmissionRow — a row from the `submissions` Supabase table.
+// Used by FeedbackExport and other components that receive the
+// full DB record alongside the grading result.
+// ============================================================
+export interface SubmissionRow {
+  id: string;
+  student_id: string;
+  test_id: string;
+  /** Raw essay text submitted by the student */
+  content: string;
+  /** The IELTS writing prompt / question */
+  prompt: string;
+  /** Submission status: pending → grading → graded | cancelled */
+  status: "pending" | "grading" | "graded" | "cancelled" | "live";
+  /** Overall band score (null until graded) */
+  band_score: number | null;
+  /** Full grading result JSON (null until graded) */
+  feedback: GradingFeedback | null;
+  /** Student display name (joined from profiles) */
+  student_name?: string;
+  /** Test title (joined from tests) */
+  test_title?: string;
+  /** Test type — drives which criteria are shown */
+  test_type?: "MOCK_TEST" | "PRACTICE";
+  submitted_at: string;   // ISO 8601
+  graded_at: string | null;
+  created_at: string;
+}
+
 export interface GradingFeedback {
   /** Final overall band (weighted: T1 × 1/3, T2 × 2/3), rounded to nearest 0.5 */
   overall_band: number;
@@ -118,4 +148,12 @@ export interface GradingFeedback {
 
   /** What the candidate needs to do to reach the next band */
   next_band_roadmap: NextBandRoadmap;
+
+  // ----------------------------------------------------------
+  // Backward-compat: older components may still read this field.
+  // The new prompt writes `holistic_assessment` instead.
+  // Keep optional so both old and new responses are accepted.
+  // ----------------------------------------------------------
+  /** @deprecated Use holistic_assessment instead */
+  examiner_summary?: string;
 }
