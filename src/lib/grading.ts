@@ -143,7 +143,28 @@ function extractJson(raw: string): GradingFeedback {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Provider: Groq
+// Provider: Gemini (Primary)
+// ─────────────────────────────────────────────────────────────
+async function gradeWithGemini(
+  content: string,
+  testPrompt: string,
+  taskType: TaskType,
+): Promise<GradingFeedback> {
+  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
+  const model = genAI.getGenerativeModel({
+    model:             "gemini-2.5-flash",
+    systemInstruction: buildSystemPrompt(taskType),
+    generationConfig:  { temperature: 0.2 },
+  });
+
+  const result = await model.generateContent(
+    `Prompt:\n${testPrompt}\n\nEssay:\n${content}`,
+  );
+  return extractJson(result.response.text());
+}
+
+// ─────────────────────────────────────────────────────────────
+// Provider: Groq (Fallback)
 // ─────────────────────────────────────────────────────────────
 async function gradeWithGroq(
   content: string,
@@ -166,28 +187,7 @@ async function gradeWithGroq(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Provider: Gemini (fallback)
-// ─────────────────────────────────────────────────────────────
-async function gradeWithGemini(
-  content: string,
-  testPrompt: string,
-  taskType: TaskType,
-): Promise<GradingFeedback> {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_API_KEY!);
-  const model = genAI.getGenerativeModel({
-    model:             "gemini-2.5-flash",
-    systemInstruction: buildSystemPrompt(taskType),
-    generationConfig:  { temperature: 0.2 },
-  });
-
-  const result = await model.generateContent(
-    `Prompt:\n${testPrompt}\n\nEssay:\n${content}`,
-  );
-  return extractJson(result.response.text());
-}
-
-// ─────────────────────────────────────────────────────────────
-// Public API — Groq trước, Gemini dự phòng
+// Public API — Gemini trước, Groq dự phòng
 // ─────────────────────────────────────────────────────────────
 export async function gradeSubmission(
   content: string,
@@ -195,9 +195,9 @@ export async function gradeSubmission(
   taskType: TaskType = "task2",
 ): Promise<GradingFeedback> {
   try {
-    return await gradeWithGroq(content, testPrompt, taskType);
-  } catch (groqError) {
-    console.warn("[grader] Groq failed, falling back to Gemini:", groqError);
     return await gradeWithGemini(content, testPrompt, taskType);
+  } catch (geminiError) {
+    console.warn("[grader] Gemini failed, falling back to Groq:", geminiError);
+    return await gradeWithGroq(content, testPrompt, taskType);
   }
 }
