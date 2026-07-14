@@ -36,6 +36,8 @@ Briefly unpack the provided question.
   },
 } as const;
 
+type TaskType = keyof typeof TASK_CONFIG;
+
 function buildSystemPrompt(taskType: TaskType): string {
   const t = TASK_CONFIG[taskType];
 
@@ -45,7 +47,7 @@ CORE INSTRUCTIONS:
 1. FOCUS HEAVILY on ${t.primaryFocus}.
    ${t.currentBandNote}
 2. For Lexical Resource (LR) and Grammatical Range & Accuracy (GRA), ONLY correct actual errors — grammar, spelling, unnatural collocations. DO NOT rewrite the entire essay. Preserve the original voice.
-3. Band scores use 0.5 steps only (5.0 / 5.5 / 6.0 … 9.0). No other values.
+3. Band scores use 0.5 steps only (5.0 / 5.5 / 6.0 … 9.0). Overall and Task bands MUST be half-bands. Component scores (${t.criterionLabel === "Task Achievement" ? "TA" : "TR"}, CC, LR, GRA) MUST be whole integers (1–9).
 4. Justifications MUST quote specific phrases from the essay. Generic feedback is not acceptable.
 5. Only give a roadmap to Band 8.0 / 9.0 when current score is already 7.0+. Otherwise target the band immediately above.
 6. "explanation" fields in the corrections array MUST be written in VIETNAMESE.
@@ -58,11 +60,11 @@ REQUIRED RESPONSE STRUCTURE — use these EXACT section headers in this EXACT or
 ${t.promptAnalysis}
 
 ## OVERALL & COMPONENT SCORES
-- Overall Band Score: X.X
-- ${t.criterionLabel}: X.X
-- Coherence & Cohesion: X.X
-- Lexical Resource: X.X
-- Grammatical Range & Accuracy: X.X
+- Overall Band Score: X.X (Must be a half-band, e.g., 6.0, 6.5)
+- ${t.criterionLabel}: X (Must be an integer 1-9)
+- Coherence & Cohesion: X (Must be an integer 1-9)
+- Lexical Resource: X (Must be an integer 1-9)
+- Grammatical Range & Accuracy: X (Must be an integer 1-9)
 
 ## BAND PROGRESSION ANALYSIS
 
@@ -99,21 +101,21 @@ After the structured markdown sections, output a single valid JSON object.
 No markdown fences. No preamble. Match EXACTLY this shape:
 
 {
-  "overall_band": number,
+  "overall_band": number, // MUST be a half-band (e.g., 5.0, 5.5, 6.0, 6.5)
   "examiner_summary": string,
   "task1": {
-    "band": number,
-    "TA": number,
-    "CC": number,
-    "LR": number,
-    "GRA": number
+    "band": number, // MUST be a half-band (e.g., 5.0, 5.5, 6.0)
+    "TA": number,   // MUST be an integer 1-9
+    "CC": number,   // MUST be an integer 1-9
+    "LR": number,   // MUST be an integer 1-9
+    "GRA": number   // MUST be an integer 1-9
   } | null,
   "task2": {
-    "band": number,
-    "TR": number,
-    "CC": number,
-    "LR": number,
-    "GRA": number
+    "band": number, // MUST be a half-band (e.g., 5.0, 5.5, 6.0)
+    "TR": number,   // MUST be an integer 1-9
+    "CC": number,   // MUST be an integer 1-9
+    "LR": number,   // MUST be an integer 1-9
+    "GRA": number   // MUST be an integer 1-9
   } | null,
   "corrections": [
     {
