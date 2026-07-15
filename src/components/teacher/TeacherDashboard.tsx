@@ -70,14 +70,75 @@ function parseSubmissionContent(raw: string | null | undefined) {
   return { task1Answer, task2Answer };
 }
 
-// Nâng cấp: Export File DOC đính kèm luôn cả Feedback của AI nếu có
-function handleDownloadDoc(studentName: string, content: string, feedback?: any) {
+// ---- Các hàm hỗ trợ xuất file DOC, đảm bảo nội dung file tải về khớp với UI trên web ----
+
+function escapeHtml(value?: string) {
+  return (value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+type ExportSections = {
+  task1Prompt?: string;
+  task1ImageUrl?: string | null;
+  task1Answer?: string;
+  task2Prompt?: string;
+  task2Answer?: string;
+  teacherComment?: string;
+};
+
+// Dựng phần HTML cho Task 1 & Task 2 (đề bài + ảnh + bài làm) — dùng chung cho cả 2 kiểu export
+function buildTaskSectionsHtml(sections: ExportSections) {
+  let html = "";
+
+  html += `<h3 style="color:#0f172a;border-left:4px solid #06b6d4;padding-left:10px;margin-top:24px;">TASK 1</h3>`;
+  if (sections.task1Prompt) {
+    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <p style="margin:0 0 4px 0;font-size:10pt;font-weight:bold;color:#64748b;text-transform:uppercase;">Đề bài</p>
+      <p style="margin:0;white-space:pre-wrap;font-size:11pt;">${escapeHtml(sections.task1Prompt)}</p>
+    </div>`;
+  }
+  if (sections.task1ImageUrl) {
+    html += `<div style="text-align:center;margin-bottom:10px;">
+      <img src="${sections.task1ImageUrl}" style="max-width:500px;max-height:350px;border:1px solid #e2e8f0;border-radius:8px;" />
+    </div>`;
+  }
+  html += `<div style="margin-bottom:10px;">
+    <p style="margin:0 0 4px 0;font-size:10pt;font-weight:bold;color:#64748b;text-transform:uppercase;">Bài làm học sinh</p>
+    <p style="white-space:pre-wrap;font-size:11pt;line-height:1.8;">${sections.task1Answer ? escapeHtml(sections.task1Answer) : "<i>Học sinh chưa làm Task 1</i>"}</p>
+  </div>`;
+
+  html += `<h3 style="color:#0f172a;border-left:4px solid #06b6d4;padding-left:10px;margin-top:24px;">TASK 2</h3>`;
+  if (sections.task2Prompt) {
+    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <p style="margin:0 0 4px 0;font-size:10pt;font-weight:bold;color:#64748b;text-transform:uppercase;">Đề bài</p>
+      <p style="margin:0;white-space:pre-wrap;font-size:11pt;">${escapeHtml(sections.task2Prompt)}</p>
+    </div>`;
+  }
+  html += `<div style="margin-bottom:10px;">
+    <p style="margin:0 0 4px 0;font-size:10pt;font-weight:bold;color:#64748b;text-transform:uppercase;">Bài làm học sinh</p>
+    <p style="white-space:pre-wrap;font-size:11pt;line-height:1.8;">${sections.task2Answer ? escapeHtml(sections.task2Answer) : "<i>Học sinh chưa làm Task 2</i>"}</p>
+  </div>`;
+
+  return html;
+}
+
+// Nâng cấp: Export File DOC đầy đủ — đề bài, ảnh Task 1, bài làm từng Task, nhận xét giáo viên và Feedback AI nếu có
+function handleDownloadDoc(studentName: string, sections: ExportSections, feedback?: any) {
   const header =
     "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title><style>body { font-family: 'Times New Roman', serif; line-height: 1.6; color: #1e293b; } .feedback-box { background: #f0fdfa; border: 1px solid #ccfbf1; padding: 15px; border-radius: 8px; margin-top: 20px; } .correction { background: #fff; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 4px; } .wrong { color: #ef4444; text-decoration: line-through; } .right { color: #10b981; font-weight: bold; } .reason { color: #64748b; font-size: 0.9em; }</style></head><body>";
   const footer = "</body></html>";
 
-  let sourceHTML = `<h2 style="text-align:center; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Bài làm của ${studentName}</h2>`;
-  sourceHTML += `<p style="white-space: pre-wrap; font-size: 11pt;">${content}</p>`;
+  let sourceHTML = `<h2 style="text-align:center; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Bài làm của ${escapeHtml(studentName)}</h2>`;
+  sourceHTML += buildTaskSectionsHtml(sections);
+
+  if (sections.teacherComment && sections.teacherComment.trim()) {
+    sourceHTML += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:15px;margin-top:24px;">
+      <h3 style="color:#059669;margin-top:0;">Nhận xét bổ sung của giáo viên</h3>
+      <p style="white-space:pre-wrap;font-size:11pt;">${escapeHtml(sections.teacherComment)}</p>
+    </div>`;
+  }
 
   if (feedback) {
     sourceHTML += `<div class="feedback-box">`;
@@ -129,22 +190,19 @@ export default function TeacherDashboard() {
   }); // Trạng thái thu gọn / mở rộng từng Task
   const router = useRouter();
 
-  // Hàm xử lý Export chỉ Text
-  const handleExportRawText = (studentName: string, content: string) => {
-    if (!content) return;
+  // Hàm xử lý Export nhanh (icon Download cạnh tiêu đề) — cũng theo cấu trúc Task 1 / Task 2 giống UI
+  const handleExportRawText = (studentName: string, sections: ExportSections) => {
+    if (!sections.task1Answer && !sections.task2Answer) return;
 
-    // 1. Tạo cấu trúc HTML cho MS Word hiểu được
     const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export</title></head><body>";
     const footer = "</body></html>";
-    // Sử dụng white-space: pre-wrap để giữ nguyên xuống dòng của bài làm
-    const fullHtml = `${header}<p style="white-space: pre-wrap; font-family: 'Times New Roman'; font-size: 12pt;">${content}</p>${footer}`;
+    const bodyHtml = buildTaskSectionsHtml(sections);
+    const fullHtml = `${header}<h2 style="text-align:center; color:#0f172a;">Bài làm của ${escapeHtml(studentName)}</h2>${bodyHtml}${footer}`;
 
-    // 2. Chuyển Blob type thành application/msword
     const blob = new Blob([fullHtml], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    // 3. Đổi đuôi file thành .doc
     link.download = `${studentName.replace(/\s+/g, "_")}.doc`;
     document.body.appendChild(link);
     link.click();
@@ -587,9 +645,17 @@ export default function TeacherDashboard() {
                           {selectedSubmission.content && (
                             <div className="relative flex items-center">
                               <button
-                                onClick={() => handleExportRawText(selectedSubmission.student_name, selectedSubmission.content ?? "")}
+                                onClick={() =>
+                                  handleExportRawText(selectedSubmission.student_name, {
+                                    task1Prompt: selectedSubmission.tests?.task1_prompt,
+                                    task1ImageUrl: selectedSubmission.tests?.image_url,
+                                    task1Answer: parsedContent.task1Answer,
+                                    task2Prompt: selectedSubmission.tests?.task2_prompt,
+                                    task2Answer: parsedContent.task2Answer,
+                                  })
+                                }
                                 className="group p-1.5 rounded-lg text-slate-400 hover:bg-cyan-50 hover:text-cyan-600 hover:shadow-sm border border-transparent hover:border-cyan-200 transition-all"
-                                title="Xuất bài làm (Chỉ văn bản)"
+                                title="Xuất bài làm (Đề bài + Task 1/2)"
                               >
                                 <Download className="h-4 w-4" />
                               </button>
@@ -777,7 +843,18 @@ export default function TeacherDashboard() {
 
                       <button
                         onClick={() =>
-                          handleDownloadDoc(selectedSubmission.student_name, selectedSubmission.content ?? "", selectedSubmission.feedback)
+                          handleDownloadDoc(
+                            selectedSubmission.student_name,
+                            {
+                              task1Prompt: selectedSubmission.tests?.task1_prompt,
+                              task1ImageUrl: selectedSubmission.tests?.image_url,
+                              task1Answer: parsedContent.task1Answer,
+                              task2Prompt: selectedSubmission.tests?.task2_prompt,
+                              task2Answer: parsedContent.task2Answer,
+                              teacherComment: teacherCommentDraft,
+                            },
+                            selectedSubmission.feedback,
+                          )
                         }
                         disabled={!selectedSubmission.content}
                         className="flex items-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-cyan-700 hover:border-cyan-200 disabled:opacity-50"
