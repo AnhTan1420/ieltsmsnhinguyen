@@ -62,6 +62,7 @@ export type SubmissionRow = {
   started_at: string;
   submitted_at: string | null;
   created_at: string;
+  teacher_comment?: string | null;
   tests?: {
     title: string;
     task1_prompt: string;
