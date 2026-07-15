@@ -116,7 +116,7 @@ function sanitizeBands(raw: GradingFeedback, taskType: TaskType): GradingFeedbac
     raw.task1.CC  = toInteger(raw.task1.CC ?? 1);
     raw.task1.LR  = toInteger(raw.task1.LR ?? 1);
     raw.task1.GRA = toInteger(raw.task1.GRA ?? 1);
-    
+
     const mean = (raw.task1.TA + raw.task1.CC + raw.task1.LR + raw.task1.GRA) / 4;
     raw.task1.band = toHalfBand(mean);
   }
@@ -128,7 +128,7 @@ function sanitizeBands(raw: GradingFeedback, taskType: TaskType): GradingFeedbac
     raw.task2.CC  = toInteger(raw.task2.CC ?? 1);
     raw.task2.LR  = toInteger(raw.task2.LR ?? 1);
     raw.task2.GRA = toInteger(raw.task2.GRA ?? 1);
-    
+
     const mean = (raw.task2.TR + raw.task2.CC + raw.task2.LR + raw.task2.GRA) / 4;
     raw.task2.band = toHalfBand(mean);
   }
@@ -161,7 +161,6 @@ function extractJson(raw: string, taskType: TaskType): GradingFeedback {
   jsonString = jsonString.slice(start, end + 1);
 
   // 3. XỬ LÝ LỖI ESCAPE CHARACTER (Nguyên nhân gây lỗi 512)
-  // Thay thế các dòng xuống dòng thực tế bằng \n hợp lệ
   jsonString = jsonString.replace(/\\n/g, "\\\\n")
                         .replace(/\\r/g, "\\\\r")
                         .replace(/\\t/g, "\\\\t");
@@ -177,28 +176,61 @@ function extractJson(raw: string, taskType: TaskType): GradingFeedback {
   }
 }
 
+/** Lỗi có nên fallback sang model/provider khác hay không (rate limit/quota/quá tải) */
+function isFallbackWorthyError(err: any): boolean {
+  const status = err?.status ?? err?.response?.status;
+  if (status === 429 || status === 413 || status === 503) return true;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return (
+    msg.includes("rate_limit") ||
+    msg.includes("quota") ||
+    msg.includes("too large") ||
+    msg.includes("overloaded")
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
-// Provider: Groq
+// Provider: Groq — thử lần lượt 70b (chất lượng cao) rồi 8b (TPM rộng hơn)
 // ─────────────────────────────────────────────────────────────
+
+const GROQ_MODEL_CHAIN: Array<{ model: string; maxTokens: number }> = [
+  { model: process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile", maxTokens: 3500 },
+  { model: "llama-3.1-8b-instant", maxTokens: 2800 },
+];
+
 async function gradeWithGroq(
   content: string,
   testPrompt: string,
   taskType: TaskType,
 ): Promise<GradingFeedback> {
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  const systemPrompt = buildSystemPrompt(taskType);
+  const userContent = `Prompt:\n${testPrompt}\n\nEssay:\n${content}`;
 
-  const completion = await groq.chat.completions.create({
-    model:       process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
-    temperature: 0.2, 
-    max_tokens:  4096,
-    messages: [
-      { role: "system", content: buildSystemPrompt(taskType) },
-      { role: "user",   content: `Prompt:\n${testPrompt}\n\nEssay:\n${content}` },
-    ],
-  });
+  let lastError: any;
 
-  const raw = completion.choices[0]?.message?.content ?? "";
-  return extractJson(raw, taskType);
+  for (const { model, maxTokens } of GROQ_MODEL_CHAIN) {
+    try {
+      const completion = await groq.chat.completions.create({
+        model,
+        temperature: 0.2,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+      });
+
+      const raw = completion.choices[0]?.message?.content ?? "";
+      return extractJson(raw, taskType);
+    } catch (err: any) {
+      lastError = err;
+      if (!isFallbackWorthyError(err)) throw err; // lỗi thật (vd 400) → không che giấu
+      console.warn(`⚠️ [groq] model ${model} thất bại (${err?.status ?? "?"}), thử model kế tiếp...`);
+    }
+  }
+
+  throw lastError;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -212,13 +244,13 @@ async function gradeWithGemini(
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash", // Sửa tên model thành phiên bản hợp lệ
+    model: "gemini-2.0-flash",
     contents: `Prompt:\n${testPrompt}\n\nEssay:\n${content}`,
     config: {
       systemInstruction: buildSystemPrompt(taskType),
       temperature: 0.1,
       maxOutputTokens: 4096,
-      safetySettings: [ // Bổ sung as any để vượt qua Type check của Vercel
+      safetySettings: [
         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
         { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
@@ -231,7 +263,7 @@ async function gradeWithGemini(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Public API
+// Public API — Gemini trước, rớt xuống Groq (70b → 8b) nếu Gemini fail
 // ─────────────────────────────────────────────────────────────
 export async function gradeSubmission(
   content: string,
@@ -242,185 +274,16 @@ export async function gradeSubmission(
     return await gradeWithGemini(content, testPrompt, taskType);
   } catch (geminiError) {
     console.warn("⚠️ [grader] Gemini failed. Lỗi chi tiết:", geminiError);
-    
+
     try {
       return await gradeWithGroq(content, testPrompt, taskType);
     } catch (groqError) {
       console.error("❌ [grader] Groq also failed. Lỗi chi tiết:", groqError);
-      
-      // Lấy thông điệp lỗi cụ thể để ném ra ngoài
+
       const geminiMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
       const groqMsg = groqError instanceof Error ? groqError.message : String(groqError);
-      
+
       throw new Error(`All AI providers failed! \nChi tiết lỗi Gemini: ${geminiMsg} \nChi tiết lỗi Groq: ${groqMsg}`);
     }
-  }
-}import Groq from "groq-sdk";
-import { GoogleGenAI } from "@google/genai";
-import type { GradingFeedback } from "@/lib/types";
-
-// ─────────────────────────────────────────────────────────────
-// CẤU HÌNH & HELPERS
-// ─────────────────────────────────────────────────────────────
-
-type TaskType = "task1" | "task2";
-
-/** 
- * CẮT NGẮN NỘI DUNG (Tránh lỗi 413 của Groq - Payload too large)
- * IELTS Writing thường < 500 từ (~2000 tokens). 
- * Giới hạn 8000 ký tự (~2500 tokens) là an toàn cho Groq Free Tier.
- */
-function truncateContent(content: string, limit: number = 8000): string {
-  if (content.length > limit) {
-    return content.substring(0, limit) + "\n...[Nội dung đã cắt ngắn để phù hợp giới hạn API]";
-  }
-  return content;
-}
-
-const TASK_CONFIG = {
-  task1: {
-    label: "Task 1 (Academic / General Training)",
-    primaryFocus: "Task Achievement (TA) và Coherence & Cohesion (CC)",
-    criterionLabel: "Task Achievement",
-    promptAnalysis: `## PHÂN TÍCH ĐỀ BÀI (Task Achievement Pre-check)\nPhân tích ngắn gọn biểu đồ/đề bài: Nêu xu hướng chính, các đặc điểm nổi bật và so sánh dữ liệu.`,
-    currentBandNote: "Bài viết cần có overview rõ ràng, lựa chọn và so sánh các đặc điểm chính thay vì liệt kê số liệu.",
-  },
-  task2: {
-    label: "Task 2 (Academic / General Training)",
-    primaryFocus: "Task Response (TR) và Coherence & Cohesion (CC)",
-    criterionLabel: "Task Response",
-    promptAnalysis: `## PHÂN TÍCH ĐỀ BÀI (Task Response Pre-check)\nPhân tích ngắn gọn câu hỏi: Xác định chủ đề, giải quyết tất cả các phần của câu hỏi, nêu rõ lập trường cá nhân.`,
-    currentBandNote: "Bài viết cần giải quyết đầy đủ câu hỏi, lập trường rõ ràng và có ví dụ/phân tích cụ thể.",
-  },
-} as const;
-
-function buildSystemPrompt(taskType: TaskType): string {
-  const t = TASK_CONFIG[taskType];
-  return `Act as an expert IELTS Examiner. Grade the IELTS Writing ${t.label}.
-  
-CORE INSTRUCTIONS:
-1. FOCUS on ${t.primaryFocus}.
-2. Output ONLY VALID JSON. No extra text outside the JSON.
-3. LANGUAGE: Feedback, justification, and JSON values MUST be in VIETNAMESE.
-4. CORRECTIONS: Provide specific grammar corrections.
-5. ROUNDING: Band scores must be 0.5 or integer.
-
-${t.promptAnalysis}
-
-## ĐIỂM SỐ CHI TIẾT
-- Overall Band Score: X.X
-- ${t.criterionLabel}: X.X
-- Coherence & Cohesion: X.X
-- Lexical Resource: X.X
-- Grammatical Range & Accuracy: X.X
-
-## PHÂN TÍCH
-- Band hiện tại [X.X]: Giải thích bằng tiếng Việt.
-- Tại sao không bị hạ band: Ưu điểm.
-- Tại sao chưa đạt band [X.X + 0.5]: Nhược điểm.
-- Lộ trình band tiếp theo: 2-3 bước cụ thể.
-
-## BÀI VIẾT ĐÃ ĐƯỢC CHỈNH SỬA
-(Cung cấp các câu sửa lỗi).
-
-## TỪ VỰNG GỢI Ý
-(Cung cấp bảng từ vựng).
-
-JSON OUTPUT (Append this exact JSON at the end, NO markdown):
-{
-  "overall_band": number,
-  "examiner_summary": "string",
-  "task1": { "band": number, "TA": number, "CC": number, "LR": number, "GRA": number } | null,
-  "task2": { "band": number, "TR": number, "CC": number, "LR": number, "GRA": number } | null,
-  "corrections": [ { "original": "string", "corrected": "string", "explanation": "string" } ]
-}`;
-}
-
-// ─────────────────────────────────────────────────────────────
-// XỬ LÝ JSON CỨNG CÁP
-// ─────────────────────────────────────────────────────────────
-function extractJson(raw: string, taskType: TaskType): GradingFeedback {
-  let jsonString = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
-  const start = jsonString.indexOf("{");
-  const end = jsonString.lastIndexOf("}");
-  
-  if (start === -1 || end === -1) throw new Error("Không tìm thấy JSON.");
-  jsonString = jsonString.slice(start, end + 1);
-
-  try {
-    return JSON.parse(jsonString) as GradingFeedback;
-  } catch (e) {
-    // Thử làm sạch ký tự lạ nếu parse lỗi
-    const cleaned = jsonString.replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
-    return JSON.parse(cleaned) as GradingFeedback;
-  }
-}
-
-// ─────────────────────────────────────────────────────────────
-// CÁC PROVIDER (ĐÃ THÊM TRUNCATE)
-// ─────────────────────────────────────────────────────────────
-async function gradeWithGroq(content: string, testPrompt: string, taskType: TaskType): Promise<GradingFeedback> {
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  const safeContent = truncateContent(content); // <--- CHỐNG LỖI 413
-
-  const completion = await groq.chat.completions.create({
-    model: "llama-3.1-8b-instant",
-    temperature: 0.2,
-    max_tokens: 4096,
-    messages: [
-      { role: "system", content: buildSystemPrompt(taskType) },
-      { role: "user", content: `Prompt:\n${testPrompt}\n\nEssay:\n${safeContent}` },
-    ],
-  });
-
-  return extractJson(completion.choices[0]?.message?.content ?? "", taskType);
-}
-
-async function gradeWithGemini(content: string, testPrompt: string, taskType: TaskType, modelName: string): Promise<GradingFeedback> {
-  const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
-  const safeContent = truncateContent(content); // <--- CHỐNG LỖI 429 (Giảm token đầu vào)
-
-  const response = await ai.models.generateContent({
-    model: modelName,
-    contents: `Prompt:\n${testPrompt}\n\nEssay:\n${safeContent}`,
-    config: {
-      systemInstruction: buildSystemPrompt(taskType),
-      temperature: 0.1,
-    },
-  });
-
-  return extractJson(response.text || "", taskType);
-}
-
-// ─────────────────────────────────────────────────────────────
-// CỔNG CHÍNH (FAILOVER)
-// ─────────────────────────────────────────────────────────────
-export async function gradeSubmission(
-  content: string,
-  testPrompt: string,
-  taskType: TaskType = "task2",
-): Promise<GradingFeedback> {
-  const errors: string[] = [];
-
-  // Thử Gemini 2.0
-  try {
-    return await gradeWithGemini(content, testPrompt, taskType, "gemini-2.0-flash");
-  } catch (e: any) {
-    errors.push(`Gemini 2.0 failed: ${e.message}`);
-  }
-
-  // Thử Gemini 1.5 (Nếu 2.0 không khả dụng)
-  try {
-    return await gradeWithGemini(content, testPrompt, taskType, "gemini-1.5-flash");
-  } catch (e: any) {
-    errors.push(`Gemini 1.5 failed: ${e.message}`);
-  }
-
-  // Thử Groq 8B (Nếu cả 2 Gemini đều lỗi)
-  try {
-    return await gradeWithGroq(content, testPrompt, taskType);
-  } catch (e: any) {
-    errors.push(`Groq failed: ${e.message}`);
-    throw new Error(`All AI providers failed! ${errors.join(" | ")}`);
   }
 }
