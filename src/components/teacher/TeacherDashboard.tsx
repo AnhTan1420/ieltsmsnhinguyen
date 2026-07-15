@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import JSZip from "jszip";
 import {
   AlertTriangle,
   Bot,
@@ -23,11 +22,7 @@ import {
   Sparkles,
   ChevronRight,
   LogOut,
-  Download, // Đã import thêm icon Download
-  CheckSquare,
-  Square,
-  Archive,
-  X,
+  Download // Đã import thêm icon Download
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { SubmissionRow, TestRow } from "@/lib/types";
@@ -45,11 +40,36 @@ const statusLabels: Record<string, string> = {
   disqualified: "Hủy bài làm",
 };
 
-// ─────────────────────────────────────────────────────────────
-// Helper: dựng HTML (dạng .doc) cho MỘT bài làm — dùng chung cho
-// cả nút "Xuất File DOC" (tải lẻ) và tính năng "Tải tất cả" (zip)
-// ─────────────────────────────────────────────────────────────
-function buildSubmissionDocHtml(studentName: string, content: string, feedback?: any): string {
+// Tách nội dung bài làm thô (chứa === THÔNG TIN HỌC SINH ===, === TASK 1 ===, === TASK 2 ===)
+// thành 2 phần: bài làm Task 1 và bài làm Task 2, bỏ hẳn khối thông tin học sinh khỏi hiển thị.
+function parseSubmissionContent(raw: string | null | undefined) {
+  const content = raw ?? "";
+
+  const extract = (marker: string, nextMarkers: string[]) => {
+    const startIdx = content.indexOf(marker);
+    if (startIdx === -1) return "";
+    const afterMarker = startIdx + marker.length;
+    let endIdx = content.length;
+    for (const next of nextMarkers) {
+      const idx = content.indexOf(next, afterMarker);
+      if (idx !== -1 && idx < endIdx) endIdx = idx;
+    }
+    return content.slice(afterMarker, endIdx).trim();
+  };
+
+  const task1Answer = extract("=== TASK 1 ===", ["=== TASK 2 ==="]);
+  const task2Answer = extract("=== TASK 2 ===", []);
+
+  // Fallback cho bài làm cũ không có marker: coi toàn bộ nội dung là Task 2
+  if (!task1Answer && !task2Answer && content.trim() && !content.includes("=== TASK")) {
+    return { task1Answer: "", task2Answer: content.trim() };
+  }
+
+  return { task1Answer, task2Answer };
+}
+
+// Nâng cấp: Export File DOC đính kèm luôn cả Feedback của AI nếu có
+function handleDownloadDoc(studentName: string, content: string, feedback?: any) {
   const header =
     "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title><style>body { font-family: 'Times New Roman', serif; line-height: 1.6; color: #1e293b; } .feedback-box { background: #f0fdfa; border: 1px solid #ccfbf1; padding: 15px; border-radius: 8px; margin-top: 20px; } .correction { background: #fff; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 4px; } .wrong { color: #ef4444; text-decoration: line-through; } .right { color: #10b981; font-weight: bold; } .reason { color: #64748b; font-size: 0.9em; }</style></head><body>";
   const footer = "</body></html>";
@@ -75,27 +95,13 @@ function buildSubmissionDocHtml(studentName: string, content: string, feedback?:
     sourceHTML += `</div>`;
   }
 
-  return header + sourceHTML + footer;
-}
-
-// Nâng cấp: Export File DOC đính kèm luôn cả Feedback của AI nếu có
-function handleDownloadDoc(studentName: string, content: string, feedback?: any) {
-  const fullHtml = buildSubmissionDocHtml(studentName, content, feedback);
-  const source = "data:application/vnd.ms-word;charset=utf-8," + encodeURIComponent(fullHtml);
+  const source = "data:application/vnd.ms-word;charset=utf-8," + encodeURIComponent(header + sourceHTML + footer);
   const fileDownload = document.createElement("a");
   document.body.appendChild(fileDownload);
   fileDownload.href = source;
   fileDownload.download = `IELTS_Writing_${studentName.replace(/\s+/g, "_")}.doc`;
   fileDownload.click();
   document.body.removeChild(fileDownload);
-}
-
-/** Tránh trùng tên file khi nhiều học sinh trùng tên trong cùng 1 lượt tải zip */
-function makeUniqueFileName(base: string, used: Map<string, number>): string {
-  const safeBase = base.replace(/\s+/g, "_").replace(/[\\/:*?"<>|]/g, "");
-  const count = used.get(safeBase) ?? 0;
-  used.set(safeBase, count + 1);
-  return count === 0 ? `${safeBase}.doc` : `${safeBase}_${count + 1}.doc`;
 }
 
 export default function TeacherDashboard() {
@@ -113,13 +119,9 @@ export default function TeacherDashboard() {
   const [isUploading, setIsUploading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showExportToast, setShowExportToast] = useState(false); // State cho Toast Export Text
+  const [teacherCommentDraft, setTeacherCommentDraft] = useState(""); // Nội dung nhận xét đang soạn
+  const [isSavingComment, setIsSavingComment] = useState(false); // Trạng thái đang lưu nhận xét
   const router = useRouter();
-
-  // ── State cho tính năng Chọn nhiều / Xóa hàng loạt / Tải tất cả ──
-  const [selectionMode, setSelectionMode] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-  const [isDownloadingAll, setIsDownloadingAll] = useState(false);
 
   // Hàm xử lý Export chỉ Text
   const handleExportRawText = (studentName: string, content: string) => {
@@ -134,7 +136,6 @@ export default function TeacherDashboard() {
     // 2. Chuyển Blob type thành application/msword
     const blob = new Blob([fullHtml], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.href = url;
     // 3. Đổi đuôi file thành .doc
@@ -158,6 +159,7 @@ export default function TeacherDashboard() {
   // Logic Auto Sign Out sau 30 phút (1,800,000 ms)
   useEffect(() => {
     if (!isAuthed) return;
+
     let timeoutId: NodeJS.Timeout;
 
     const resetTimer = () => {
@@ -171,6 +173,7 @@ export default function TeacherDashboard() {
     // Lắng nghe các hành động của người dùng
     window.addEventListener("mousemove", resetTimer);
     window.addEventListener("keydown", resetTimer);
+
     // Khởi tạo bộ đếm lần đầu
     resetTimer();
 
@@ -194,6 +197,18 @@ export default function TeacherDashboard() {
     [selectedId, submissions],
   );
 
+  // Đồng bộ nội dung nhận xét mỗi khi chọn bài làm khác
+  useEffect(() => {
+    setTeacherCommentDraft((selectedSubmission as any)?.teacher_comment ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSubmission?.id]);
+
+  // Tách sẵn nội dung Task 1 / Task 2 từ bài làm thô
+  const parsedContent = useMemo(
+    () => parseSubmissionContent(selectedSubmission?.content),
+    [selectedSubmission?.content],
+  );
+
   const loadTests = async () => {
     try {
       const { data, error: testError } = await supabase.from("tests").select("*").order("created_at", { ascending: false });
@@ -208,7 +223,7 @@ export default function TeacherDashboard() {
     try {
       const { data, error: loadError } = await supabase
         .from("submissions")
-        .select("*, tests(title, task1_prompt, task2_prompt, duration_minutes)")
+        .select("*, tests(title, task1_prompt, task2_prompt, image_url, duration_minutes)")
         .order("created_at", { ascending: false });
       if (loadError) return setError(loadError.message);
       setSubmissions((data ?? []) as SubmissionRow[]);
@@ -219,6 +234,7 @@ export default function TeacherDashboard() {
 
   useEffect(() => {
     if (!isAuthed) return;
+
     const load = async () => {
       await Promise.all([loadSubmissions(), loadTests()]);
     };
@@ -253,7 +269,6 @@ export default function TeacherDashboard() {
       const { data: publicUrlData } = supabase.storage.from("test-images").getPublicUrl(filePath);
       setEditingTest({ ...editingTest, image_url: publicUrlData.publicUrl });
     }
-
     setIsUploading(false);
   };
 
@@ -282,7 +297,6 @@ export default function TeacherDashboard() {
     }
 
     setIsSavingTest(false);
-
     if (responseError) setError(responseError.message);
     else {
       setEditingTest(null);
@@ -339,6 +353,7 @@ export default function TeacherDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Chấm bài thất bại.");
       void loadSubmissions();
@@ -356,113 +371,27 @@ export default function TeacherDashboard() {
     setError(null);
 
     const { error: deleteError } = await supabase.from("submissions").delete().eq("id", submission.id);
-
     setIsDeleting(false);
 
     if (deleteError) return setError(deleteError.message);
-
     if (selectedId === submission.id) setSelectedId(null);
     void loadSubmissions();
   };
 
-  // ─────────────────────────────────────────────────────────────
-  // Chọn nhiều / Xóa hàng loạt
-  // ─────────────────────────────────────────────────────────────
-  const toggleSelectionMode = () => {
-    setSelectionMode((prev) => !prev);
-    setSelectedIds(new Set()); // reset lựa chọn mỗi lần bật/tắt
-  };
-
-  const toggleSelectId = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    setSelectedIds((prev) => {
-      if (prev.size === submissions.length) return new Set();
-      return new Set(submissions.map((s) => s.id));
-    });
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return;
-    if (
-      !window.confirm(
-        `Xóa vĩnh viễn ${selectedIds.size} bài làm đã chọn? Hành động này không thể hoàn tác.`,
-      )
-    )
-      return;
-
-    setIsBulkDeleting(true);
+  // Lưu nhận xét bổ sung của giáo viên vào cột teacher_comment
+  const handleSaveComment = async () => {
+    if (!selectedSubmission) return;
+    setIsSavingComment(true);
     setError(null);
 
-    const ids = Array.from(selectedIds);
-    const { error: deleteError } = await supabase.from("submissions").delete().in("id", ids);
+    const { error: updateError } = await supabase
+      .from("submissions")
+      .update({ teacher_comment: teacherCommentDraft })
+      .eq("id", selectedSubmission.id);
 
-    setIsBulkDeleting(false);
-
-    if (deleteError) return setError(deleteError.message);
-
-    if (selectedId && ids.includes(selectedId)) setSelectedId(null);
-    setSelectedIds(new Set());
-    setSelectionMode(false);
-    void loadSubmissions();
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // Tải tất cả bài làm (zip) — nếu đang có bài được chọn (selectionMode)
-  // thì chỉ zip các bài đó, ngược lại zip toàn bộ danh sách hiện có.
-  // ─────────────────────────────────────────────────────────────
-  const handleDownloadAll = async () => {
-    const targets =
-      selectionMode && selectedIds.size > 0
-        ? submissions.filter((s) => selectedIds.has(s.id))
-        : submissions;
-
-    const withContent = targets.filter((s) => s.content && s.content.trim().length > 0);
-
-    if (withContent.length === 0) {
-      setError("Không có bài làm nào có nội dung để tải.");
-      return;
-    }
-
-    setIsDownloadingAll(true);
-    setError(null);
-
-    try {
-      const zip = new JSZip();
-      const usedNames = new Map<string, number>();
-
-      for (const submission of withContent) {
-        const html = buildSubmissionDocHtml(
-          submission.student_name,
-          submission.content ?? "",
-          (submission as any).feedback,
-        );
-        const fileName = makeUniqueFileName(submission.student_name, usedNames);
-        zip.file(fileName, html);
-      }
-
-      const blob = await zip.generateAsync({ type: "blob" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const stamp = new Date().toISOString().slice(0, 10);
-      link.download = `Bai_lam_IELTS_${stamp}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (err) {
-      setError(err instanceof Error ? `Lỗi khi tạo file zip: ${err.message}` : "Lỗi khi tạo file zip.");
-    } finally {
-      setIsDownloadingAll(false);
-    }
+    setIsSavingComment(false);
+    if (updateError) setError(updateError.message);
+    else void loadSubmissions();
   };
 
   if (!authChecked) {
@@ -546,9 +475,6 @@ export default function TeacherDashboard() {
           <div className="p-4 bg-red-50 text-red-900 rounded-2xl border border-red-200 flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
             <div className="bg-red-100 p-2 rounded-full"><AlertTriangle className="h-5 w-5 text-red-600" /></div>
             <p className="font-medium text-sm">{error}</p>
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600">
-              <X className="h-4 w-4" />
-            </button>
           </div>
         )}
 
@@ -556,63 +482,13 @@ export default function TeacherDashboard() {
           <section className="grid gap-6 lg:grid-cols-[380px_1fr] items-start">
             {/* Sidebar Danh sách */}
             <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60 sticky top-6 max-h-[85vh] flex flex-col">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-100">
                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   Bài làm <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">{submissions.length}</span>
                 </h2>
-                <button
-                  onClick={toggleSelectionMode}
-                  className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors ${selectionMode
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-500 border-slate-200 hover:border-slate-300 hover:text-slate-700"
-                    }`}
-                  title="Bật/tắt chế độ chọn nhiều bài"
-                >
-                  {selectionMode ? <CheckSquare className="h-3.5 w-3.5" /> : <Square className="h-3.5 w-3.5" />}
-                  Chọn nhiều
-                </button>
               </div>
 
-              {/* Thanh công cụ: xóa hàng loạt + tải tất cả */}
-              <div className="flex items-center gap-2 py-3 border-b border-slate-100 mb-1">
-                {selectionMode && (
-                  <button
-                    onClick={toggleSelectAll}
-                    className="text-xs font-semibold text-cyan-700 hover:text-cyan-800 px-2 py-1"
-                  >
-                    {selectedIds.size === submissions.length && submissions.length > 0 ? "Bỏ chọn tất cả" : "Chọn tất cả"}
-                  </button>
-                )}
-
-                <div className="ml-auto flex items-center gap-2">
-                  {selectionMode && selectedIds.size > 0 && (
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={isBulkDeleting}
-                      className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
-                    >
-                      {isBulkDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                      Xóa đã chọn ({selectedIds.size})
-                    </button>
-                  )}
-
-                  <button
-                    onClick={handleDownloadAll}
-                    disabled={isDownloadingAll || submissions.length === 0}
-                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors disabled:opacity-50"
-                    title={
-                      selectionMode && selectedIds.size > 0
-                        ? `Tải ${selectedIds.size} bài đã chọn dưới dạng .zip`
-                        : "Tải toàn bộ bài làm dưới dạng .zip"
-                    }
-                  >
-                    {isDownloadingAll ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Archive className="h-3.5 w-3.5" />}
-                    Tải {selectionMode && selectedIds.size > 0 ? `(${selectedIds.size})` : "tất cả"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3 overflow-y-auto pr-2 pb-2 custom-scrollbar mt-3">
+              <div className="space-y-3 overflow-y-auto pr-2 pb-2 custom-scrollbar">
                 {submissions.length === 0 && (
                   <div className="text-center py-12 px-4 border-2 border-dashed border-slate-100 rounded-2xl">
                     <Clock className="mx-auto h-8 w-8 text-slate-300 mb-2" />
@@ -621,61 +497,39 @@ export default function TeacherDashboard() {
                 )}
 
                 {submissions.map((submission) => (
-                  <div key={submission.id} className="relative">
-                    {selectionMode && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toggleSelectId(submission.id);
-                        }}
-                        className="absolute top-4 right-4 z-10 p-1 rounded-md bg-white shadow-sm border border-slate-200"
-                        title="Chọn bài này"
-                      >
-                        {selectedIds.has(submission.id) ? (
-                          <CheckSquare className="h-4 w-4 text-cyan-600" />
-                        ) : (
-                          <Square className="h-4 w-4 text-slate-400" />
-                        )}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() =>
-                        selectionMode ? toggleSelectId(submission.id) : setSelectedId(submission.id)
-                      }
-                      className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 group ${selectedSubmission?.id === submission.id && !selectionMode
-                          ? "border-cyan-400 bg-cyan-50/50 ring-4 ring-cyan-50"
-                          : selectionMode && selectedIds.has(submission.id)
-                            ? "border-cyan-300 bg-cyan-50/30"
-                            : "border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50 hover:-translate-y-0.5 hover:shadow-sm"
-                        }`}
-                    >
-                      <div className="flex justify-between items-start gap-2 mb-1.5 pr-6">
-                        <span className="font-bold text-slate-900 group-hover:text-cyan-700 transition-colors">{submission.student_name}</span>
-                        {submission.status === "in_progress" && (
-                          <span className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" /> LIVE
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 line-clamp-1 font-medium mb-3">{submission.tests?.title ?? "Đề đã bị xóa"}</p>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusStyles[submission.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
-                          {statusLabels[submission.status] || submission.status}
+                  <button
+                    key={submission.id}
+                    onClick={() => setSelectedId(submission.id)}
+                    className={`w-full text-left p-4 rounded-2xl border transition-all duration-200 group ${selectedSubmission?.id === submission.id
+                      ? "border-cyan-400 bg-cyan-50/50 ring-4 ring-cyan-50"
+                      : "border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50 hover:-translate-y-0.5 hover:shadow-sm"
+                      }`}
+                  >
+                    <div className="flex justify-between items-start gap-2 mb-1.5">
+                      <span className="font-bold text-slate-900 group-hover:text-cyan-700 transition-colors">{submission.student_name}</span>
+                      {submission.status === "in_progress" && (
+                        <span className="flex items-center gap-1.5 text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" /> LIVE
                         </span>
-                        {submission.warning_count > 0 && (
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                            <ShieldAlert className="h-3 w-3" /> {submission.warning_count}/5
-                          </span>
-                        )}
-                        {submission.band_score != null && (
-                          <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white border border-slate-900 shadow-sm flex items-center gap-1">
-                            <Sparkles className="h-3 w-3 text-cyan-400" /> Band {submission.band_score}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 line-clamp-1 font-medium mb-3">{submission.tests?.title ?? "Đề đã bị xóa"}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${statusStyles[submission.status] || "bg-slate-50 text-slate-600 border-slate-200"}`}>
+                        {statusLabels[submission.status] || submission.status}
+                      </span>
+                      {submission.warning_count > 0 && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                          <ShieldAlert className="h-3 w-3" /> {submission.warning_count}/5
+                        </span>
+                      )}
+                      {submission.band_score != null && (
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-900 text-white border border-slate-900 shadow-sm flex items-center gap-1">
+                          <Sparkles className="h-3 w-3 text-cyan-400" /> Band {submission.band_score}
+                        </span>
+                      )}
+                    </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -750,10 +604,79 @@ export default function TeacherDashboard() {
                         )}
                       </div>
 
-                      {/* Giao diện Đọc bài được nâng cấp */}
-                      <div className="whitespace-pre-wrap font-serif text-[16px] leading-[2.2] bg-[#fcfcfc] border border-slate-300 rounded-xl px-8 py-8 shadow-inner min-h-[300px] text-slate-800 tracking-wide selection:bg-cyan-200">
-                        {selectedSubmission.content?.trim() || <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa nhập nội dung nào...</span>}
-                      </div>
+                      {/* Giao diện hiển thị bài làm theo từng Task, kèm đề bài + ảnh minh họa */}
+                      {!selectedSubmission.content?.trim() ? (
+                        <div className="flex items-center justify-center min-h-[200px] bg-[#fcfcfc] border border-slate-300 rounded-xl">
+                          <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa nhập nội dung nào...</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {/* TASK 1 */}
+                          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                            <div className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3">
+                              <ImageIcon className="h-4 w-4 text-cyan-400" />
+                              <span className="font-black tracking-wide text-sm">TASK 1</span>
+                            </div>
+                            <div className="p-5 space-y-4">
+                              {selectedSubmission.tests?.task1_prompt && (
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 border-l-4 border-l-cyan-400 p-4">
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
+                                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                    {selectedSubmission.tests.task1_prompt}
+                                  </p>
+                                </div>
+                              )}
+
+                              {selectedSubmission.tests?.image_url && (
+                                <div className="flex justify-center bg-white border border-slate-200 rounded-xl p-3">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={selectedSubmission.tests.image_url}
+                                    alt="Minh họa đề Task 1"
+                                    className="max-h-[360px] object-contain rounded-lg"
+                                  />
+                                </div>
+                              )}
+
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
+                                <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
+                                  {parsedContent.task1Answer || (
+                                    <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 1...</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* TASK 2 */}
+                          <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+                            <div className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3">
+                              <BookOpen className="h-4 w-4 text-cyan-400" />
+                              <span className="font-black tracking-wide text-sm">TASK 2</span>
+                            </div>
+                            <div className="p-5 space-y-4">
+                              {selectedSubmission.tests?.task2_prompt && (
+                                <div className="rounded-xl bg-slate-50 border border-slate-200 border-l-4 border-l-cyan-400 p-4">
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
+                                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                    {selectedSubmission.tests.task2_prompt}
+                                  </p>
+                                </div>
+                              )}
+
+                              <div>
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
+                                <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
+                                  {parsedContent.task2Answer || (
+                                    <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 2...</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Action Buttons */}
@@ -810,6 +733,30 @@ export default function TeacherDashboard() {
                           <Clock className="h-4 w-4" /> Hệ thống đang chờ học sinh ấn nút nộp bài để có thể chấm điểm.
                         </div>
                       )}
+                    </div>
+
+                    {/* Nhận xét bổ sung của giáo viên */}
+                    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm space-y-3">
+                      <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <FileCheck2 className="h-4 w-4 text-slate-500" /> Nhận xét bổ sung của giáo viên
+                      </label>
+                      <textarea
+                        rows={4}
+                        className="w-full rounded-xl border border-slate-300 p-3 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all resize-none shadow-sm"
+                        placeholder="Viết nhận xét cho học sinh..."
+                        value={teacherCommentDraft}
+                        onChange={(e) => setTeacherCommentDraft(e.target.value)}
+                      />
+                      <div className="flex justify-end">
+                        <button
+                          onClick={handleSaveComment}
+                          disabled={isSavingComment}
+                          className="flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 shadow-sm transition disabled:opacity-50"
+                        >
+                          {isSavingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                          Gửi nhận xét
+                        </button>
+                      </div>
                     </div>
 
                     {/* AI Feedback UI Premium */}
