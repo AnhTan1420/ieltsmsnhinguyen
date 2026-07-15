@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { GradingFeedback } from "@/lib/types";
 
 // ─────────────────────────────────────────────────────────────
-// Unified prompt builder — one function for Task 1 & Task 2
+// Unified prompt builder — một hàm chung cho cả Task 1 & Task 2
 // ─────────────────────────────────────────────────────────────
 
 type TaskType = "task1" | "task2";
@@ -11,27 +11,27 @@ type TaskType = "task1" | "task2";
 const TASK_CONFIG = {
   task1: {
     label:           "Task 1 (Academic / General Training)",
-    primaryFocus:    "Task Achievement (TA) and Coherence & Cohesion (CC)",
+    primaryFocus:    "Task Achievement (TA) và Coherence & Cohesion (CC)",
     criterionLabel:  "Task Achievement",
-    promptAnalysis: `## PROMPT ANALYSIS (Task Achievement Pre-check)
-Briefly analyse the chart / graph / map / letter prompt.
-- Main trend or purpose that MUST appear in the overview
-- Key features that MUST be highlighted and compared
-- Specific data points or bullet points that cannot be missed`,
+    promptAnalysis: `## PHÂN TÍCH ĐỀ BÀI (Task Achievement Pre-check)
+Hãy phân tích ngắn gọn biểu đồ / đồ thị / bản đồ / thư của đề bài:
+- Xu hướng chính hoặc mục đích cốt lõi BẮT BUỘC phải xuất hiện trong phần tổng quan (overview).
+- Các đặc điểm chính cần được làm nổi bật và so sánh rõ ràng.
+- Các điểm dữ liệu cụ thể hoặc các ý chi tiết trong đề bài không được bỏ sót.`,
     currentBandNote:
-      "Did the essay present a clear overview? Were key features selected and compared — not every data point listed?",
+      "Bài viết đã đưa ra một phần tổng quan (overview) rõ ràng chưa? Các đặc điểm chính đã được lựa chọn và so sánh phù hợp chưa — hay chỉ đơn thuần liệt kê lại toàn bộ số liệu?",
   },
   task2: {
     label:           "Task 2 (Academic / General Training)",
-    primaryFocus:    "Task Response (TR) and Coherence & Cohesion (CC)",
+    primaryFocus:    "Task Response (TR) và Coherence & Cohesion (CC)",
     criterionLabel:  "Task Response",
-    promptAnalysis: `## PROMPT ANALYSIS (Task Response Pre-check)
-Briefly unpack the provided question.
-- Core topic
-- ALL parts of the question that MUST be addressed (both views / causes & solutions / etc.)
-- What position or opinion is required`,
+    promptAnalysis: `## PHÂN TÍCH ĐỀ BÀI (Task Response Pre-check)
+Hãy phân tích ngắn gọn câu hỏi được đưa ra:
+- Chủ đề cốt lõi của bài viết.
+- TẤT CẢ các phần của câu hỏi cần phải được giải quyết (ví dụ: thảo luận cả 2 quan điểm / nêu nguyên nhân & giải pháp / v.v.).
+- Lập trường hoặc ý kiến cá nhân được yêu cầu trong đề bài là gì.`,
     currentBandNote:
-      "Did the essay address ALL parts of the question? Is the position clear and consistently maintained? Were ideas extended with examples and analysis — not just asserted?",
+      "Bài viết đã giải quyết đầy đủ TẤT CẢ các phần của câu hỏi chưa? Lập trường của người viết có rõ ràng và được giữ vững xuyên suốt bài viết không? Các ý tưởng có được mở rộng bằng ví dụ và phân tích cụ thể không — hay chỉ dừng lại ở mức khẳng định?",
   },
 } as const;
 
@@ -52,8 +52,7 @@ CORE INSTRUCTIONS:
      Example: TA=6 CC=6 LR=7 GRA=7 → mean=6.5 → stays 6.5
 4. Justifications MUST quote specific phrases from the essay. Generic feedback is not acceptable.
 5. Only give a roadmap to Band 8.0 / 9.0 when current score is already 7.0+. Otherwise target the band immediately above.
-6. "explanation" fields in the corrections array MUST be written in VIETNAMESE.
-7. "examiner_summary" MUST be written in ENGLISH.
+6. LANGUAGE RULE: All evaluations, justifications, feedback, roadmap steps, analyses, vocabulary explanations, and JSON string values (including "examiner_summary" and "explanation") MUST be written in VIETNAMESE. Only the quoted phrases from the student's essay and the correction fields ("original", "corrected") remain in English.
 
 ─────────────────────────────────────────
 REQUIRED RESPONSE STRUCTURE — use these EXACT section headers in this EXACT order
@@ -61,40 +60,39 @@ REQUIRED RESPONSE STRUCTURE — use these EXACT section headers in this EXACT or
 
 ${t.promptAnalysis}
 
-## OVERALL & COMPONENT SCORES
+## ĐIỂM SỐ CHI TIẾT & ĐIỂM OVERALL
 - Overall Band Score: X.X
 - ${t.criterionLabel}: X.X
 - Coherence & Cohesion: X.X
 - Lexical Resource: X.X
 - Grammatical Range & Accuracy: X.X
 
-## BAND PROGRESSION ANALYSIS
+## PHÂN TÍCH TIẾN TRÌNH BAND ĐIỂM
 
-### Current Band [X.X] — Why this score
+### Band hiện tại [X.X] — Tại sao đạt mức điểm này
 ${t.currentBandNote}
-Cite specific phrases from the essay to justify the score.
+Trích dẫn trực tiếp các cụm từ/câu cụ thể từ bài viết bằng tiếng Anh và giải thích chi tiết bằng tiếng Việt để minh chứng cho mức điểm này.
 
-### Why not Band [X.X − 0.5]
-Name at least one concrete feature the essay demonstrated that earns the higher score.
+### Tại sao không bị hạ xuống Band [X.X − 0.5]
+Chỉ ra ít nhất một đặc điểm hoặc ưu điểm thực tế bằng tiếng Việt mà bài viết đã thể hiện tốt để xứng đáng giữ vững mức điểm này.
 
-### Why not Band [X.X + 0.5]
-Name exactly what is missing or flawed — specific sentences, missing features, or recurring error patterns.
+### Tại sao chưa đạt được Band [X.X + 0.5]
+Nêu rõ những điểm còn thiếu sót hoặc lỗi sai cụ thể — nêu rõ câu văn lỗi, cấu trúc thiếu sót hoặc các lỗi sai lặp đi lặp lại (giải thích bằng tiếng Việt).
 
-### Next Band Roadmap [X.X + 0.5]
-2–3 SPECIFIC, ACTIONABLE steps referencing actual sentences or paragraphs from THIS essay.
-(Target Band 8.0+ only when current score is already 7.0+.)
+### Lộ trình đạt Band tiếp theo [X.X + 0.5]
+Đưa ra 2–3 bước hành động CỤ THỂ, THỰC TẾ và rõ ràng bằng tiếng Việt, có đối chiếu trực tiếp với các câu hoặc đoạn văn trong chính bài viết này.
+(Chỉ hướng dẫn lộ trình lên Band 8.0+ nếu điểm hiện tại đã đạt từ 7.0+ trở lên.)
 
-## LIGHTLY CORRECTED ESSAY
-Reproduce the full essay with minimal targeted corrections only.
-Use **bold** for every changed word or phrase. Do not rewrite for style.
+## BÀI VIẾT ĐÃ ĐƯỢC CHỈNH SỬA (Targeted Corrections)
+Trích xuất và sửa lại các câu có chứa lỗi sai. Sử dụng định dạng **in đậm** cho những từ hoặc cụm từ đã được chỉnh sửa. Không tự ý viết lại cả bài theo văn phong khác nếu không cần thiết.
 
-## SUGGESTED VOCABULARY & STRUCTURES
-| Original | Better Alternative | Why it's better |
-|----------|--------------------|-----------------|
-| ...      | ...                | ...             |
+## TỪ VỰNG & CẤU TRÚC GỢI Ý
+| Từ gốc (Original) | Lựa chọn thay thế tốt hơn (Better Alternative) | Lý do cải thiện tốt hơn (Why it's better - Giải thích bằng tiếng Việt) |
+|-------------------|-----------------------------------------------|-----------------------------------------------------------------------|
+| ...               | ...                                           | ...                                                                   |
 
-Provide 1–2 advanced sentence structures tailored to this specific essay's topic.
-Show a concrete example sentence — not a generic template.
+Gợi ý thêm 1–2 cấu trúc câu nâng cao được thiết kế riêng cho chủ đề bài viết này.
+Cung cấp câu ví dụ thực tế cụ thể bằng tiếng Anh kèm giải nghĩa tiếng Việt — không sử dụng các mẫu template chung chung.
 
 ─────────────────────────────────────────
 JSON OUTPUT — append after all sections above
@@ -104,7 +102,7 @@ No markdown fences. No preamble. Match EXACTLY this shape:
 
 {
   "overall_band": number,        // half-band: 5.0 / 5.5 / 6.0 / 6.5 / 7.0 / 7.5 / 8.0 / 8.5 / 9.0
-  "examiner_summary": string,
+  "examiner_summary": string,    // Nhận xét tổng quan bằng TIẾNG VIỆT
   "task1": {
     "band": number,
     "TA": number,
@@ -121,9 +119,9 @@ No markdown fences. No preamble. Match EXACTLY this shape:
   } | null,
   "corrections": [
     {
-      "original": string,
-      "corrected": string,
-      "explanation": string
+      "original": string,        // Câu gốc tiếng Anh của học sinh
+      "corrected": string,       // Câu đã sửa lỗi tiếng Anh
+      "explanation": string      // Giải thích chi tiết bằng TIẾNG VIỆT
     }
   ]
 }`;
@@ -220,7 +218,6 @@ function extractJson(raw: string, taskType: TaskType): GradingFeedback {
 
   try {
     const parsed = JSON.parse(jsonString) as GradingFeedback;
-    // Bỏ thêm taskType vào hàm sanitize
     return sanitizeBands(parsed, taskType);
   } catch (parseError) {
     console.error("❌ Thất bại khi parse JSON từ AI. Chuỗi trích xuất được là:");
@@ -242,6 +239,7 @@ async function gradeWithGroq(
   const completion = await groq.chat.completions.create({
     model:       process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
     temperature: 0.2,
+    max_tokens:  4096, // Cấu hình giới hạn tối đa tránh bị cắt cụt JSON nửa chừng
     messages: [
       { role: "system", content: buildSystemPrompt(taskType) },
       { role: "user",   content: `Prompt:\n${testPrompt}\n\nEssay:\n${content}` },
@@ -249,7 +247,6 @@ async function gradeWithGroq(
   });
 
   const raw = completion.choices[0]?.message?.content ?? "";
-  // Truyền taskType để sanitize
   return extractJson(raw, taskType);
 }
 
@@ -269,10 +266,10 @@ async function gradeWithGemini(
     config: {
       systemInstruction: buildSystemPrompt(taskType),
       temperature: 0.2,
+      maxOutputTokens: 4096, // Tăng giới hạn token đầu ra để chứa được cả Markdown lẫn JSON hoàn chỉnh
     },
   });
 
-  // Truyền taskType để sanitize
   return extractJson(response.text || "", taskType);
 }
 
