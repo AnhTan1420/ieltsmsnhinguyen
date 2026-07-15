@@ -67,6 +67,7 @@ export type SubmissionRow = {
     title: string;
     task1_prompt: string;
     task2_prompt: string;
+    image_url: string | null;
     duration_minutes: number;
   } | null;
 };
