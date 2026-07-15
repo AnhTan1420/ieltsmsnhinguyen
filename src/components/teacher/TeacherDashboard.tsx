@@ -21,6 +21,8 @@ import {
   Loader2,
   Sparkles,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   LogOut,
   Download // Đã import thêm icon Download
 } from "lucide-react";
@@ -121,6 +123,10 @@ export default function TeacherDashboard() {
   const [showExportToast, setShowExportToast] = useState(false); // State cho Toast Export Text
   const [teacherCommentDraft, setTeacherCommentDraft] = useState(""); // Nội dung nhận xét đang soạn
   const [isSavingComment, setIsSavingComment] = useState(false); // Trạng thái đang lưu nhận xét
+  const [expandedTasks, setExpandedTasks] = useState<{ task1: boolean; task2: boolean }>({
+    task1: false,
+    task2: false,
+  }); // Trạng thái thu gọn / mở rộng từng Task
   const router = useRouter();
 
   // Hàm xử lý Export chỉ Text
@@ -197,9 +203,10 @@ export default function TeacherDashboard() {
     [selectedId, submissions],
   );
 
-  // Đồng bộ nội dung nhận xét mỗi khi chọn bài làm khác
+  // Đồng bộ nội dung nhận xét + thu gọn lại các Task mỗi khi chọn bài làm khác
   useEffect(() => {
     setTeacherCommentDraft((selectedSubmission as any)?.teacher_comment ?? "");
+    setExpandedTasks({ task1: false, task2: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSubmission?.id]);
 
@@ -604,76 +611,134 @@ export default function TeacherDashboard() {
                         )}
                       </div>
 
-                      {/* Giao diện hiển thị bài làm theo từng Task, kèm đề bài + ảnh minh họa */}
+                      {/* Giao diện hiển thị bài làm theo từng Task — mặc định thu gọn, bấm để xem đầy đủ */}
                       {!selectedSubmission.content?.trim() ? (
                         <div className="flex items-center justify-center min-h-[200px] bg-[#fcfcfc] border border-slate-300 rounded-xl">
                           <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa nhập nội dung nào...</span>
                         </div>
                       ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-4">
                           {/* TASK 1 */}
                           <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-                            <div className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3">
-                              <ImageIcon className="h-4 w-4 text-cyan-400" />
-                              <span className="font-black tracking-wide text-sm">TASK 1</span>
-                            </div>
-                            <div className="p-5 space-y-4">
-                              {selectedSubmission.tests?.task1_prompt && (
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 border-l-4 border-l-cyan-400 p-4">
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
-                                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                    {selectedSubmission.tests.task1_prompt}
-                                  </p>
-                                </div>
-                              )}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedTasks((prev) => ({ ...prev, task1: !prev.task1 }))}
+                              className="w-full flex items-center justify-between gap-2 bg-slate-900 text-white px-5 py-3 hover:bg-slate-800 transition-colors"
+                            >
+                              <span className="flex items-center gap-2 font-black tracking-wide text-sm">
+                                <ImageIcon className="h-4 w-4 text-cyan-400" /> TASK 1
+                              </span>
+                              <span className="flex items-center gap-1 text-xs font-bold text-cyan-300">
+                                {expandedTasks.task1 ? (
+                                  <>Thu gọn <ChevronUp className="h-3.5 w-3.5" /></>
+                                ) : (
+                                  <>Xem đầy đủ <ChevronDown className="h-3.5 w-3.5" /></>
+                                )}
+                              </span>
+                            </button>
 
-                              {selectedSubmission.tests?.image_url && (
-                                <div className="flex justify-center bg-white border border-slate-200 rounded-xl p-3">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={selectedSubmission.tests.image_url}
-                                    alt="Minh họa đề Task 1"
-                                    className="max-h-[360px] object-contain rounded-lg"
-                                  />
-                                </div>
-                              )}
+                            {expandedTasks.task1 ? (
+                              <div className="p-5 space-y-4">
+                                {selectedSubmission.tests?.task1_prompt && (
+                                  <div className="rounded-xl bg-slate-50 border border-slate-200 border-l-4 border-l-cyan-400 p-4">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
+                                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                      {selectedSubmission.tests.task1_prompt}
+                                    </p>
+                                  </div>
+                                )}
 
-                              <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
-                                <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
-                                  {parsedContent.task1Answer || (
-                                    <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 1...</span>
-                                  )}
+                                {selectedSubmission.tests?.image_url && (
+                                  <div className="flex justify-center bg-white border border-slate-200 rounded-xl p-3">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={selectedSubmission.tests.image_url}
+                                      alt="Minh họa đề Task 1"
+                                      className="max-h-[360px] object-contain rounded-lg"
+                                    />
+                                  </div>
+                                )}
+
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
+                                  <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
+                                    {parsedContent.task1Answer || (
+                                      <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 1...</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedTasks((prev) => ({ ...prev, task1: true }))}
+                                className="w-full text-left p-4 hover:bg-slate-50 transition-colors"
+                              >
+                                <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+                                  {parsedContent.task1Answer || (
+                                    <span className="italic text-slate-400">Học sinh chưa làm Task 1...</span>
+                                  )}
+                                </p>
+                                <p className="mt-2 text-[11px] font-bold text-cyan-600">
+                                  Bấm để xem đề bài{selectedSubmission.tests?.image_url ? ", ảnh minh họa" : ""} và toàn bộ bài làm →
+                                </p>
+                              </button>
+                            )}
                           </div>
 
                           {/* TASK 2 */}
                           <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
-                            <div className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3">
-                              <BookOpen className="h-4 w-4 text-cyan-400" />
-                              <span className="font-black tracking-wide text-sm">TASK 2</span>
-                            </div>
-                            <div className="p-5 space-y-4">
-                              {selectedSubmission.tests?.task2_prompt && (
-                                <div className="rounded-xl bg-slate-50 border border-slate-200 border-l-4 border-l-cyan-400 p-4">
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
-                                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                    {selectedSubmission.tests.task2_prompt}
-                                  </p>
-                                </div>
-                              )}
+                            <button
+                              type="button"
+                              onClick={() => setExpandedTasks((prev) => ({ ...prev, task2: !prev.task2 }))}
+                              className="w-full flex items-center justify-between gap-2 bg-slate-900 text-white px-5 py-3 hover:bg-slate-800 transition-colors"
+                            >
+                              <span className="flex items-center gap-2 font-black tracking-wide text-sm">
+                                <BookOpen className="h-4 w-4 text-cyan-400" /> TASK 2
+                              </span>
+                              <span className="flex items-center gap-1 text-xs font-bold text-cyan-300">
+                                {expandedTasks.task2 ? (
+                                  <>Thu gọn <ChevronUp className="h-3.5 w-3.5" /></>
+                                ) : (
+                                  <>Xem đầy đủ <ChevronDown className="h-3.5 w-3.5" /></>
+                                )}
+                              </span>
+                            </button>
 
-                              <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
-                                <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
-                                  {parsedContent.task2Answer || (
-                                    <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 2...</span>
-                                  )}
+                            {expandedTasks.task2 ? (
+                              <div className="p-5 space-y-4">
+                                {selectedSubmission.tests?.task2_prompt && (
+                                  <div className="rounded-xl bg-slate-50 border border-slate-200 border-l-4 border-l-cyan-400 p-4">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Đề bài</p>
+                                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                      {selectedSubmission.tests.task2_prompt}
+                                    </p>
+                                  </div>
+                                )}
+
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
+                                  <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
+                                    {parsedContent.task2Answer || (
+                                      <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 2...</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedTasks((prev) => ({ ...prev, task2: true }))}
+                                className="w-full text-left p-4 hover:bg-slate-50 transition-colors"
+                              >
+                                <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
+                                  {parsedContent.task2Answer || (
+                                    <span className="italic text-slate-400">Học sinh chưa làm Task 2...</span>
+                                  )}
+                                </p>
+                                <p className="mt-2 text-[11px] font-bold text-cyan-600">Bấm để xem đề bài và toàn bộ bài làm →</p>
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
