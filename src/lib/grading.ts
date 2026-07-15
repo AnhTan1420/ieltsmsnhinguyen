@@ -167,29 +167,3 @@ export async function gradeSubmission(
     throw new Error(`All AI providers failed! ${errors.join(" | ")}`);
   }
 }
-// ─────────────────────────────────────────────────────────────
-// Public API
-// ─────────────────────────────────────────────────────────────
-export async function gradeSubmission(
-  content: string,
-  testPrompt: string,
-  taskType: TaskType = "task2",
-): Promise<GradingFeedback> {
-  try {
-    return await gradeWithGemini(content, testPrompt, taskType);
-  } catch (geminiError) {
-    console.warn("⚠️ [grader] Gemini failed. Lỗi chi tiết:", geminiError);
-    
-    try {
-      return await gradeWithGroq(content, testPrompt, taskType);
-    } catch (groqError) {
-      console.error("❌ [grader] Groq also failed. Lỗi chi tiết:", groqError);
-      
-      // Lấy thông điệp lỗi cụ thể để ném ra ngoài
-      const geminiMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
-      const groqMsg = groqError instanceof Error ? groqError.message : String(groqError);
-      
-      throw new Error(`All AI providers failed! \nChi tiết lỗi Gemini: ${geminiMsg} \nChi tiết lỗi Groq: ${groqMsg}`);
-    }
-  }
-}
