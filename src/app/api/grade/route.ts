@@ -2,15 +2,13 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { gradeSubmission } from "@/lib/grading";
 
-// Tăng giới hạn thời gian chạy trên Vercel lên 60 giây để tránh 502
+// Cấu hình tăng thời gian xử lý cho Vercel
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  // 1. Nhận tham số
   const { submissionId, content, testPrompt, taskType, task1Prompt, task2Prompt } = await request.json();
 
-  // 2. Validate cơ bản
   if (!submissionId || !content || !taskType) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
@@ -27,7 +25,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Missing task prompts for both tasks" }, { status: 400 });
       }
 
-      // Gọi song song 2 task để tối ưu thời gian
       const [feedback1, feedback2] = await Promise.all([
         gradeSubmission(content, task1Prompt, "task1"),
         gradeSubmission(content, task2Prompt, "task2")
@@ -47,10 +44,7 @@ export async function POST(request: Request) {
         examiner_summary: `### Task 1 Evaluation:\n${fb1.examiner_summary || "Không có nhận xét."}\n\n### Task 2 Evaluation:\n${fb2.examiner_summary || "Không có nhận xét."}`,
         task1: fb1.task1 || { band: band1, TA: fb1.TA, CC: fb1.CC, LR: fb1.LR, GRA: fb1.GRA },
         task2: fb2.task2 || { band: band2, TR: fb2.TR, CC: fb2.CC, LR: fb2.LR, GRA: fb2.GRA },
-        corrections: [
-          ...(fb1.corrections || []),
-          ...(fb2.corrections || [])
-        ]
+        corrections: [ ...(fb1.corrections || []), ...(fb2.corrections || []) ]
       };
     } else {
       if (!testPrompt) {
@@ -59,7 +53,6 @@ export async function POST(request: Request) {
       feedback = await gradeSubmission(content, testPrompt, taskType);
     }
 
-    // 3. Cập nhật vào Supabase
     const { error } = await getSupabaseAdmin()
       .from("submissions")
       .update({ feedback, band_score: feedback.overall_band })
@@ -67,21 +60,30 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("❌ Supabase update failed:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Lỗi lưu dữ liệu.", detail: error.message }, { status: 502 });
     }
 
     return NextResponse.json(feedback);
 
-  } catch (error) {
-    // 1. Log chi tiết lỗi vào Vercel (dùng để kiểm tra trên Vercel Dashboard)
+  } catch (error: any) {
+    // Log chi tiết vào Vercel
     console.error("❌ GRADING FAILED:", error);
     
-    // 2. Trả về thông tin chi tiết cho Frontend (để F12 Console hiển thị)
     const technicalDetail = error instanceof Error ? error.message : String(error);
     
+    // PHÂN LOẠI LỖI:
+    // Nếu là lỗi Quota/Rate Limit (429) -> Trả về 503
+    if (technicalDetail.includes("429") || technicalDetail.includes("Quota") || technicalDetail.includes("Rate limit")) {
+      return NextResponse.json({ 
+        error: "Hệ thống AI đang quá tải. Vui lòng thử lại sau.",
+        detail: technicalDetail 
+      }, { status: 503 });
+    }
+
+    // Nếu là lỗi code/hệ thống khác -> Trả về 502
     return NextResponse.json({ 
-        error: "Hệ thống AI đang quá tải hoặc hết lượt dùng. Vui lòng thử lại sau ít phút hoặc liên hệ Anh Tân.",
-        detail: technicalDetail // Dòng này giúp bạn debug ở F12
-    }, { status: 503 });
+        error: "Đã xảy ra lỗi hệ thống nghiêm trọng.",
+        detail: technicalDetail 
+    }, { status: 502 });
   }
 }
