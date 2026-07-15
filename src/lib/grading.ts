@@ -253,7 +253,7 @@ async function gradeWithGroq(
 
   const completion = await groq.chat.completions.create({
     model:       process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
-    temperature: 0.1, // Giảm temperature xuống 0.1 để tăng tính nhất quán và độ chính xác của ngữ pháp
+    temperature: 0.2, 
     max_tokens:  4096,
     messages: [
       { role: "system", content: buildSystemPrompt(taskType) },
