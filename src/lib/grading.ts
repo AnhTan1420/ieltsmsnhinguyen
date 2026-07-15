@@ -269,8 +269,6 @@ async function gradeWithGemini(
     config: {
       systemInstruction: buildSystemPrompt(taskType),
       temperature: 0.2,
-      responseMimeType: "application/json", // CỨU CÁNH: Buộc model trả về chuẩn JSON
-      maxOutputTokens: 4096,
     },
   });
 
