@@ -270,7 +270,7 @@ async function gradeWithGemini(
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash", // Sửa tên model thành phiên bản hợp lệ
+    model: "gemini-1.5-flash", // Sửa tên model thành phiên bản hợp lệ
     contents: `Prompt:\n${testPrompt}\n\nEssay:\n${content}`,
     config: {
       systemInstruction: buildSystemPrompt(taskType),
