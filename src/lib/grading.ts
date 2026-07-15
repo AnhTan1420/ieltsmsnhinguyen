@@ -246,7 +246,7 @@ async function gradeWithGroq(
   const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
   const completion = await groq.chat.completions.create({
-    model:       process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile",
+    model:       process.env.GROQ_MODEL ?? "llama-3.1-8b-instant",
     temperature: 0.2, 
     max_tokens:  4096,
     messages: [
@@ -270,7 +270,7 @@ async function gradeWithGemini(
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_GEMINI_API_KEY });
 
   const response = await ai.models.generateContent({
-    model: "gemini-1.5-flash", // Sửa tên model thành phiên bản hợp lệ
+    model: "gemini-2.0-flash", // Sửa tên model thành phiên bản hợp lệ
     contents: `Prompt:\n${testPrompt}\n\nEssay:\n${content}`,
     config: {
       systemInstruction: buildSystemPrompt(taskType),
