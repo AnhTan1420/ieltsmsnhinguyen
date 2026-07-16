@@ -847,7 +847,7 @@ export default function TeacherDashboard() {
                       </div>
 
                       {/* Gợi ý cách xem lỗi tô sáng — chỉ hiện khi đã có kết quả chấm */}
-                      {selectedSubmission.feedback?.corrections?.length > 0 && (
+                     {(selectedSubmission.feedback?.corrections?.length ?? 0) > 0 && (
                         <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 w-fit">
                           <span className="inline-block h-3 w-3 rounded-sm bg-amber-200/70 border border-amber-400" />
                           Di chuột vào phần được tô vàng để xem đề xuất sửa từ AI
