@@ -95,6 +95,19 @@ function countWords(text?: string | null): number {
   return trimmed.split(/\s+/).filter(Boolean).length;
 }
 
+/** Đếm số correction có "original" xuất hiện trong đoạn text cho trước — dùng để tách thống kê lỗi theo từng Task */
+function countMatchedCorrections(text: string | undefined | null, corrections: { original: string }[]): number {
+  if (!text || !corrections || corrections.length === 0) return 0;
+  let count = 0;
+  for (const c of corrections) {
+    if (!c?.original) continue;
+    let idx = text.indexOf(c.original);
+    if (idx === -1) idx = text.toLowerCase().indexOf(c.original.toLowerCase());
+    if (idx !== -1) count++;
+  }
+  return count;
+}
+
 type Correction = { original: string; corrected: string; explanation: string };
 
 /**
@@ -794,8 +807,8 @@ export default function TeacherDashboard() {
           <section
             className={`grid gap-6 items-start ${
               (selectedSubmission?.feedback?.corrections?.length ?? 0) > 0
-                ? "lg:grid-cols-[320px_1fr_280px]"
-                : "lg:grid-cols-[320px_1fr]"
+                ? "lg:grid-cols-[280px_1fr_260px]"
+                : "lg:grid-cols-[280px_1fr]"
             }`}
           >
             {/* Sidebar Danh sách */}
@@ -1269,28 +1282,43 @@ export default function TeacherDashboard() {
                         </div>
 
                         <div className="p-6 space-y-8">
-                          {/* Thống kê từ */}
-                          <div className="flex flex-wrap gap-3">
-                            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm px-4 py-3 flex items-center gap-3">
-                              <div className="bg-slate-100 p-2 rounded-xl"><Type className="h-4 w-4 text-slate-500" /></div>
-                              <div>
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Số từ bài làm</p>
-                                <p className="text-lg font-black text-slate-900">
-                                  {countWords(parsedContent.task1Answer) + countWords(parsedContent.task2Answer)} <span className="text-xs font-medium text-slate-400">từ</span>
-                                </p>
-                              </div>
-                            </div>
-                            {(selectedSubmission.feedback.corrections?.length ?? 0) > 0 && (
-                              <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm px-4 py-3 flex items-center gap-3">
-                                <div className="bg-amber-100 p-2 rounded-xl"><AlertTriangle className="h-4 w-4 text-amber-600" /></div>
-                                <div>
-                                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Số lỗi được phát hiện</p>
-                                  <p className="text-lg font-black text-slate-900">
-                                    {selectedSubmission.feedback.corrections.length} <span className="text-xs font-medium text-slate-400">lỗi</span>
+                          {/* Thống kê từ & lỗi — tách riêng theo từng Task */}
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {[
+                              { label: "Task 1", text: parsedContent.task1Answer, icon: <ImageIcon className="h-3.5 w-3.5" /> },
+                              { label: "Task 2", text: parsedContent.task2Answer, icon: <BookOpen className="h-3.5 w-3.5" /> },
+                            ].map((task) => {
+                              const errorCount = countMatchedCorrections(task.text, selectedSubmission.feedback.corrections ?? []);
+                              return (
+                                <div key={task.label} className="rounded-2xl bg-white border border-slate-200/60 shadow-sm p-4 space-y-3">
+                                  <p className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                                    {task.icon} {task.label}
                                   </p>
+                                  <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-2">
+                                      <div className="bg-slate-100 p-1.5 rounded-lg shrink-0"><Type className="h-3.5 w-3.5 text-slate-500" /></div>
+                                      <div>
+                                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số từ</p>
+                                        <p className="text-base font-black text-slate-900">
+                                          {countWords(task.text)} <span className="text-[10px] font-medium text-slate-400">từ</span>
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {(selectedSubmission.feedback.corrections?.length ?? 0) > 0 && (
+                                      <div className="flex items-center gap-2">
+                                        <div className="bg-amber-100 p-1.5 rounded-lg shrink-0"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                                        <div>
+                                          <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số lỗi</p>
+                                          <p className="text-base font-black text-slate-900">
+                                            {errorCount} <span className="text-[10px] font-medium text-slate-400">lỗi</span>
+                                          </p>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })}
                           </div>
 
                           <div className="bg-white rounded-2xl p-5 border border-cyan-100/50 shadow-sm relative">
