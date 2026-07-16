@@ -1304,7 +1304,7 @@ export default function TeacherDashboard() {
                                         </p>
                                       </div>
                                     </div>
-                                    {(selectedSubmission.feedback.corrections?.length ?? 0) > 0 && (
+                                    {(selectedSubmission.feedback?.corrections?.length ?? 0) > 0 && (
                                       <div className="flex items-center gap-2">
                                         <div className="bg-amber-100 p-1.5 rounded-lg shrink-0"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
                                         <div>
