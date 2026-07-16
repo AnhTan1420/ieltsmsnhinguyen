@@ -341,7 +341,7 @@ function buildFullDocHtml(studentName: string, sections: ExportSections, feedbac
 
   if (feedback) {
     sourceHTML += `<div class="feedback-box">`;
-    sourceHTML += `<h3 style="color: #0d9488; margin-top: 0;">Kết quả chấm AI - Overall Band: ${feedback.overall_band}</h3>`;
+    sourceHTML += `<h3 style="color: #0d9488; margin-top: 0;">Kết quả chấm - Overall Band: ${feedback.overall_band}</h3>`;
     sourceHTML += `<p><strong>Nhận xét tổng quan:</strong> ${feedback.examiner_summary}</p>`;
 
     if (feedback.corrections && feedback.corrections.length > 0) {
@@ -752,7 +752,7 @@ export default function TeacherDashboard() {
   // Tải tất cả bài làm (zip) — nếu đang chọn nhiều thì chỉ zip các bài
   // đã chọn, ngược lại zip toàn bộ danh sách hiện có. Mỗi file .doc bên
   // trong zip có cấu trúc y hệt UI: đề bài + ảnh Task 1 + bài làm từng
-  // Task + nhận xét giáo viên + kết quả chấm AI (nếu có).
+  // Task + nhận xét giáo viên + kết quả chấm (nếu có).
   // ─────────────────────────────────────────────────────────────
   const handleDownloadAll = async () => {
     const targets =
