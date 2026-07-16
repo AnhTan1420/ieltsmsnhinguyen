@@ -289,7 +289,7 @@ function buildFullDocHtml(studentName: string, sections: ExportSections, feedbac
 
   if (feedback) {
     sourceHTML += `<div class="feedback-box">`;
-    sourceHTML += `<h3 style="color: #0d9488; margin-top: 0;">Kết quả chấm AI - Overall Band: ${feedback.overall_band}</h3>`;
+    sourceHTML += `<h3 style="color: #0d9488; margin-top: 0;">Kết quả chấm - Overall Band: ${feedback.overall_band}</h3>`;
     sourceHTML += `<p><strong>Nhận xét tổng quan:</strong> ${feedback.examiner_summary}</p>`;
 
     if (feedback.corrections && feedback.corrections.length > 0) {
