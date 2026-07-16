@@ -181,11 +181,41 @@ function renderHighlightedAnswer(
 
 // ---- Các hàm hỗ trợ xuất file DOC, đảm bảo nội dung file tải về khớp với UI trên web ----
 
-function escapeHtml(value?: string) {
-  return (value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+/**
+ * Word chặn tự động tải ảnh từ URL ngoài khi mở file .doc (giống cách Outlook chặn ảnh từ xa
+ * trong email HTML) — ảnh Task 1 sẽ hiện icon lỗi thay vì hình thật. Để khắc phục, ta tải ảnh về
+ * và nhúng thẳng dạng base64 (data URI) vào file, giúp ảnh luôn hiển thị được mà không cần mạng.
+ */
+async function imageUrlToBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+/** Trả về bản sao sections với task1ImageUrl đã chuyển sang base64 (nếu tải được), giữ nguyên URL cũ nếu lỗi.
+ * cache (tuỳ chọn) giúp tránh tải lại cùng 1 ảnh nhiều lần khi export hàng loạt (nhiều học sinh chung 1 đề thi). */
+async function resolveSectionsImage(sections: ExportSections, cache?: Map<string, string>): Promise<ExportSections> {
+  if (!sections.task1ImageUrl) return sections;
+  const url = sections.task1ImageUrl;
+
+  const cached = cache?.get(url);
+  if (cached) return { ...sections, task1ImageUrl: cached };
+
+  const base64 = await imageUrlToBase64(url);
+  if (!base64) return sections;
+
+  cache?.set(url, base64);
+  return { ...sections, task1ImageUrl: base64 };
 }
 
 type ExportSections = {
@@ -196,6 +226,13 @@ type ExportSections = {
   task2Answer?: string;
   teacherComment?: string;
 };
+
+function escapeHtml(value?: string) {
+  return (value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 // Dựng phần HTML cho Task 1 & Task 2 (đề bài + ảnh + bài làm) — dùng chung cho mọi kiểu export
 function buildTaskSectionsHtml(sections: ExportSections) {
@@ -271,9 +308,11 @@ function buildFullDocHtml(studentName: string, sections: ExportSections, feedbac
   return header + sourceHTML + footer;
 }
 
-// Nâng cấp: Export File DOC đầy đủ — đề bài, ảnh Task 1, bài làm từng Task, nhận xét giáo viên và Feedback AI nếu có
-function handleDownloadDoc(studentName: string, sections: ExportSections, feedback?: any) {
-  const fullHtml = buildFullDocHtml(studentName, sections, feedback);
+// Nâng cấp: Export File DOC đầy đủ — đề bài, ảnh Task 1, bài làm từng Task, nhận xét giáo viên và Feedback AI nếu có.
+// Chuyển ảnh Task 1 sang base64 trước khi build HTML để ảnh luôn hiển thị được khi mở bằng Word.
+async function handleDownloadDoc(studentName: string, sections: ExportSections, feedback?: any) {
+  const resolvedSections = await resolveSectionsImage(sections);
+  const fullHtml = buildFullDocHtml(studentName, resolvedSections, feedback);
   const source = "data:application/vnd.ms-word;charset=utf-8," + encodeURIComponent(fullHtml);
   const fileDownload = document.createElement("a");
   document.body.appendChild(fileDownload);
@@ -337,12 +376,14 @@ export default function TeacherDashboard() {
   }, [isGrading]);
 
   // Hàm xử lý Export nhanh (icon Download cạnh tiêu đề) — theo cấu trúc Task 1 / Task 2 giống UI
-  const handleExportRawText = (studentName: string, sections: ExportSections) => {
+  const handleExportRawText = async (studentName: string, sections: ExportSections) => {
     if (!sections.task1Answer && !sections.task2Answer) return;
+
+    const resolvedSections = await resolveSectionsImage(sections);
 
     const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export</title></head><body>";
     const footer = "</body></html>";
-    const bodyHtml = buildTaskSectionsHtml(sections);
+    const bodyHtml = buildTaskSectionsHtml(resolvedSections);
     const fullHtml = `${header}<h2 style="text-align:center; color:#0f172a;">Bài làm của ${escapeHtml(studentName)}</h2>${bodyHtml}${footer}`;
 
     const blob = new Blob([fullHtml], { type: "application/msword" });
@@ -680,11 +721,11 @@ export default function TeacherDashboard() {
     try {
       const zip = new JSZip();
       const usedNames = new Map<string, number>();
+      const imageCache = new Map<string, string>(); // Cache base64 theo URL — nhiều học sinh chung 1 đề thi sẽ dùng chung cache, tránh tải lại ảnh nhiều lần
 
       for (const submission of withContent) {
         const parsed = parseSubmissionContent(submission.content);
-        const html = buildFullDocHtml(
-          submission.student_name,
+        const resolvedSections = await resolveSectionsImage(
           {
             task1Prompt: submission.tests?.task1_prompt,
             task1ImageUrl: submission.tests?.image_url,
@@ -693,8 +734,9 @@ export default function TeacherDashboard() {
             task2Answer: parsed.task2Answer,
             teacherComment: (submission as any).teacher_comment ?? undefined,
           },
-          submission.feedback,
+          imageCache,
         );
+        const html = buildFullDocHtml(submission.student_name, resolvedSections, submission.feedback);
         const fileName = makeUniqueFileName(submission.student_name, usedNames);
         zip.file(fileName, html);
       }
