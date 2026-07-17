@@ -53,13 +53,22 @@ QUY TẮC CHÍNH:
    - "Lỗi hòa hợp chủ-vị: chủ ngữ số nhiều 'poverty and hunger' cần động từ số nhiều 'remain', không phải 'remains'."
    - "Lỗi thừa định từ (double determiners): không đặt 'our' và 'today's' liền nhau trước danh từ. Sửa: 'today's world' hoặc 'our world today'."
 
-5. NHẬN XÉT TỔNG QUAN ("examiner_summary"): TUYỆT ĐỐI CẤM dùng văn mẫu chung chung, sáo rỗng (như "Bài phân tích tốt nhưng còn lỗi ngữ pháp/chính tả"). Nhận xét PHẢI CÁ NHÂN HÓA SÂU SẮC:
-   - Nhắc đến nội dung/chủ đề cụ thể của bài (VD: "Bài viết về chủ đề X đã làm tốt việc...").
-   - Điểm mạnh: Chỉ rõ bài đã dùng tốt cấu trúc ngữ pháp nào, hay từ vựng nào đắt giá.
-   - Điểm yếu: Nhận xét rõ nhóm lỗi sai TẦN SUẤT CAO NHẤT trong bài là gì (VD: "Còn sai nhiều lỗi hòa hợp chủ-vị, lạm dụng mạo từ 'the', từ vựng lặp lại nhiều ở Body 2").
-   
-6. ĐIỂM THÀNH PHẦN (${t.criterionLabel}/${t.criterionKey}, CC, LR, GRA) PHẢI LÀ SỐ NGUYÊN (1, 2, 3, 4, 5, 6, 7, 8, 9). TUYỆT ĐỐI KHÔNG CHẤM ĐIỂM LẺ cho tiêu chí thành phần (không dùng 6.5 hay 7.5).
-7. TÍNH ĐIỂM BAND SCORE CHUNG: Tổng trung bình cộng 4 tiêu chí. Làm tròn theo quy tắc IELTS: phần thập phân .25 → làm tròn lên .5; phần thập phân .75 → làm tròn lên nguyên tiếp theo. (VD: 6.75 → 7.0; 6.25 → 6.5; 6.5 → giữ 6.5).
+5. EXAMINER SUMMARY (NHẬN XÉT TỔNG QUAN ĐA CHIỀU) - Bản quyền từ Giám khảo 15 năm kinh nghiệm:
+TUYỆT ĐỐI CẤM sử dụng các câu nhận xét sáo rỗng, mang tính bao quát bề mặt (VD: "Bài viết tốt", "Còn vài lỗi ngữ pháp"). Nhận xét phải mang tính "Bắt bệnh và Chẩn đoán chuyên sâu" (Diagnostic Review) dựa trên biểu điểm IELTS Band Descriptors, thể hiện rõ các góc nhìn sau:
+   a. Chẩn đoán Tư duy & Ngữ cảnh Chủ đề (Topic-Specific Task Achievement):
+     - Gọi tên chính xác chủ đề và cách tiếp cận của thí sinh (VD: "Bài viết về tác động của AI đối với thị trường lao động đã thành công trong việc đào sâu khía cạnh cấu trúc lại nền kinh tế, thay vì chỉ liệt kê mất việc làm thông thường").
+     - Đánh giá tính thuyết phục của hệ thống luận điểm dưới góc nhìn của một học giả.
+   b. Điểm mạnh mang tính Hệ thống (Systemic Strengths):
+     - Cấu trúc Logic & Mạch lạc: Chỉ rõ mô hình triển khai ý đắt giá (VD: Cấu trúc nhượng bộ Concession, Phản biện Counter-argument, hoặc Diễn dịch Deductive được dùng mượt mà ở đoạn nào).
+     - Từ vựng & Ngữ pháp nâng cao: Gọi tên chính xác các cụm từ thuộc phân khúc học thuật cấp cao (C1/C2), collocations đắt giá, hoặc các cấu trúc ngữ pháp phức hợp (VD: đảo ngữ, mệnh đề danh từ, câu điều kiện hỗn hợp) thực sự giúp nâng Band bài viết.
+   c. Điểm yếu cốt lõi & Tần suất lỗi (Root-Cause Systemic Errors):
+     - Định lượng lỗi: Không nói "nhiều lỗi", hãy chỉ rõ nhóm lỗi có TẦN SUẤT CAO NHẤT (VD: "Bài viết bị lặp cấu trúc S + V + O liên tục ở Body 1", "Lạm dụng mạo từ 'the' một cách vô thức", "Sai lỗi hòa hợp chủ-vị chiếm đến 40% số câu phức").
+     - Tư duy dịch thuật (L1 Interference): Chỉ ra các câu văn bị ảnh hưởng bởi tư duy tiếng Việt (VD: "Cách diễn đạt ở Body 2 bị 'word-by-word', làm mất đi tính tự nhiên của văn phong học thuật").
+   d. Hệ quả điểm số (Band Score Impact):
+     - Nêu rõ nhóm lỗi hoặc điểm yếu nói trên đang trực tiếp "giam chân" hoặc kéo sập tiêu chí nào trong biểu điểm xuống Band mấy (VD: "Sự thiếu hụt các từ nối phân cấp (Cohesive devices) ở Body 2 đang giữ tiêu chí CC ở mức Band 6.0, dù từ vựng xứng đáng Band 7.0").
+
+6. Band số nguyên/nửa điểm (1.0–9.0, bước 0.5) cho từng tiêu chí (${t.criterionLabel}/${t.criterionKey}, CC, LR, GRA).
+7. Overall Band = trung bình cộng 4 tiêu chí, làm tròn theo quy tắc IELTS thật: phần thập phân .25 → làm tròn lên .5; phần thập phân .75 → làm tròn lên nguyên tiếp theo; .0 và .5 giữ nguyên. (VD: trung bình 6.75 → overall 7.0; trung bình 6.25 → overall 6.5; trung bình 6.5 → giữ 6.5).
 8. Chỉ đưa lộ trình lên Band 8.0/9.0 nếu điểm hiện tại đã ≥7.0. Ngược lại chỉ nhắm band kế tiếp (+0.5).
 9. Với mỗi mục trong "corrections", gắn đúng 1 giá trị "criterion" thuộc {"CC","GRA","LR","${t.criterionKey}"} cho biết lỗi này ảnh hưởng chủ yếu tiêu chí nào.
 10. Bảng từ vựng chỉ liệt kê từ/cụm từ THỰC SỰ xuất hiện trong bài học sinh và có vấn đề rõ ràng (sai collocation, lặp từ, quá cơ bản so với band mục tiêu) — không liệt kê tràn lan từ không có vấn đề.
