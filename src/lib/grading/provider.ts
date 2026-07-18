@@ -52,12 +52,12 @@ async function gradeWithGroq(
 }
 
 // ─────────────────────────────────────────────────────────────
-// Provider: Gemini — thử 2.5 Flash (chất lượng cao) rồi 2.5 Flash-Lite (TPM/RPD rộng hơn)
+// Provider: Gemini — thử 3.5 Flash (chất lượng cao) rồi 3.1 Flash-Lite (TPM/RPD rộng hơn)
 // ─────────────────────────────────────────────────────────────
 
 const GEMINI_MODEL_CHAIN: Array<{ model: string; maxOutputTokens: number }> = [
-  { model: process.env.GEMINI_MODEL ?? "gemini-3-flash-preview", maxOutputTokens: 4096 },
-  { model: "gemini-2.5-flash-lite", maxOutputTokens: 3500 },
+  { model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash", maxOutputTokens: 4096 },
+  { model: "gemini-3.1-flash-lite", maxOutputTokens: 3500 },
 ];
 
 async function gradeWithGemini(
