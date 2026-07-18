@@ -69,7 +69,7 @@ export default function TeacherDashboard() {
 
   if (!isAuthed) {
     return (
-      <main className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-white text-center">
+      <main className="min-h-screen bg-slate-1000 flex flex-col items-center justify-center p-6 text-white text-center">
         <div className="bg-slate-900/50 p-10 rounded-3xl border border-slate-800 max-w-lg w-full backdrop-blur-xl">
           <div className="mx-auto bg-cyan-950/50 w-20 h-20 rounded-full flex items-center justify-center mb-6 border border-cyan-900">
             <Users className="w-10 h-10 text-cyan-400" />
