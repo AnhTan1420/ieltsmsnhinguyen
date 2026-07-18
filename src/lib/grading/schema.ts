@@ -6,8 +6,12 @@ import type { TaskType } from "./prompt";
 export function buildGradingJsonSchema(taskType: TaskType) {
   const criterionKey = taskType === "task1" ? "TA" : "TR";
 
-  const taskScoreSchema = {
+  // QUAN TRỌNG: Gemini không cho phép { type: "null" } đứng một mình làm schema
+  // của 1 field. Field "có thể null" phải khai báo type thật (object) kèm
+  // nullable: true — Gemini sẽ tự chọn trả object hoặc null cho field đó.
+  const nullableTaskScoreSchema = {
     type: "object",
+    nullable: true,
     properties: {
       band: { type: "number" },
       CC: { type: "number" },
@@ -26,8 +30,8 @@ export function buildGradingJsonSchema(taskType: TaskType) {
       overall_band: { type: "number" },
       examiner_summary: { type: "string" },
       prompt_analysis: { type: "string" },
-      task1: taskType === "task1" ? taskScoreSchema : { type: "null" },
-      task2: taskType === "task2" ? taskScoreSchema : { type: "null" },
+      task1: nullableTaskScoreSchema,
+      task2: nullableTaskScoreSchema,
       band_progression: {
         type: "object",
         properties: {
@@ -94,5 +98,49 @@ export function buildGradingJsonSchema(taskType: TaskType) {
       "advanced_structures",
       "golden_rule",
     ],
+  } as const;
+}
+
+// Schema RÚT GỌN dành riêng cho tier TPM thấp (vd Groq free/on-demand).
+// Không dùng cho Gemini (Gemini vẫn nên dùng bản full ở trên).
+export function buildMinimalGradingJsonSchema(taskType: TaskType) {
+  const criterionKey = taskType === "task1" ? "TA" : "TR";
+  const nullableTaskScoreSchema = {
+    type: "object",
+    nullable: true,
+    properties: {
+      band: { type: "number" },
+      CC: { type: "number" },
+      LR: { type: "number" },
+      GRA: { type: "number" },
+      [criterionKey]: { type: "number" },
+    },
+    required: ["band", "CC", "LR", "GRA", criterionKey],
+  };
+
+  return {
+    type: "object",
+    properties: {
+      word_count: { type: "number" },
+      meets_min_word_count: { type: "boolean" },
+      overall_band: { type: "number" },
+      examiner_summary: { type: "string" },
+      task1: nullableTaskScoreSchema,
+      task2: nullableTaskScoreSchema,
+      corrections: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            original: { type: "string" },
+            corrected: { type: "string" },
+            explanation: { type: "string" },
+            criterion: { type: "string", enum: ["CC", "GRA", "LR", criterionKey] },
+          },
+          required: ["original", "corrected", "explanation", "criterion"],
+        },
+      },
+    },
+    required: ["word_count", "meets_min_word_count", "overall_band", "examiner_summary", "task1", "task2", "corrections"],
   } as const;
 }

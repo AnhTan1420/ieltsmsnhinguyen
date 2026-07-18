@@ -1,8 +1,5 @@
-// ─────────────────────────────────────────────────────────────
-// Unified prompt builder — một hàm chung cho cả Task 1 & Task 2
-// ─────────────────────────────────────────────────────────────
-
 export type TaskType = "task1" | "task2";
+export type PromptMode = "full" | "compact" | "minimal";
 
 export const TASK_CONFIG = {
   task1: {
@@ -31,10 +28,49 @@ Nêu ngắn gọn: chủ đề chính, các phần của câu hỏi cần giải
   },
 } as const;
 
-export function buildSystemPrompt(taskType: TaskType, opts?: { compact?: boolean }): string {
+// ─────────────────────────────────────────────────────────────
+// Mode "minimal": dùng cho tier TPM cực thấp (vd Groq llama-3.1-8b-instant
+// free/on-demand, giới hạn 6000 token/phút CHO CẢ input lẫn max_tokens
+// output cộng lại). Chỉ giữ đúng phần lõi để chấm điểm được, bỏ hết phần
+// mở rộng (band_progression, vocabulary_suggestions, advanced_structures,
+// edited_essay_markdown) — các field này đã optional trong GradingFeedback
+// nên việc thiếu chúng không làm vỡ type/UI, chỉ đơn giản là không hiển thị.
+// ─────────────────────────────────────────────────────────────
+function buildMinimalPrompt(taskType: TaskType): string {
+  const t = TASK_CONFIG[taskType];
+  return `Bạn là giám khảo IELTS Writing. Chấm ${t.label} theo band descriptor chính thức (British Council/IDP). Trả lời NGẮN GỌN, không viết dài dòng.
+
+QUY TẮC:
+1. Đếm số từ thực tế. Tối thiểu yêu cầu: ${t.minWords} từ. Nếu thiếu, nêu rõ trong "examiner_summary" và trừ điểm ${t.criterionLabel}/CC hợp lý.
+2. Chấm 4 tiêu chí (${t.criterionLabel}/${t.criterionKey}, CC, LR, GRA), band 1.0-9.0 bước 0.5.
+3. "overall_band" = trung bình cộng 4 tiêu chí, làm tròn theo quy tắc IELTS thật (.25→lên .5; .75→lên nguyên tiếp theo; .0/.5 giữ nguyên). Giá trị "band" trong "${taskType}" PHẢI BẰNG "overall_band".
+4. "examiner_summary": 3-5 câu TIẾNG VIỆT, cụ thể cho đúng bài này (nhắc chủ đề bài viết), nêu rõ điểm mạnh/yếu chính đang giữ band ở mức nào — KHÔNG viết chung chung sáo rỗng kiểu "bài viết khá tốt".
+5. "corrections": liệt kê TỐI ĐA 5 lỗi quan trọng nhất ảnh hưởng band. Mỗi lỗi: "original" (câu gốc), "corrected" (câu sửa), "explanation" (tiếng Việt, nêu rõ TÊN quy tắc ngữ pháp bị vi phạm), "criterion" (CC/GRA/LR/${t.criterionKey}).
+6. Nếu nội dung nộp vào rõ ràng không phải bài làm (dán nhầm đề, văn bản không liên quan), đặt overall_band = 0 và giải thích trong examiner_summary.
+7. CHỈ trả về MỘT JSON OBJECT DUY NHẤT, không markdown code fence, không text khác trước/sau. Escape đúng " và \\n.
+
+SCHEMA:
+{
+  "word_count": number,
+  "meets_min_word_count": boolean,
+  "overall_band": number,
+  "examiner_summary": string,
+  "task1": ${taskType === "task1" ? `{"band": number, "TA": number, "CC": number, "LR": number, "GRA": number}` : "null"},
+  "task2": ${taskType === "task2" ? `{"band": number, "TR": number, "CC": number, "LR": number, "GRA": number}` : "null"},
+  "corrections": [
+    { "original": string, "corrected": string, "explanation": string, "criterion": "CC" | "GRA" | "LR" | "${t.criterionKey}" }
+  ]
+}`;
+}
+
+export function buildSystemPrompt(taskType: TaskType, opts?: { mode?: PromptMode }): string {
+  const mode = opts?.mode ?? "full";
+
+  if (mode === "minimal") return buildMinimalPrompt(taskType);
+
+  const compact = mode === "compact";
   const t = TASK_CONFIG[taskType];
   const oppositeTask = taskType === "task1" ? "Task 2" : "Task 1";
-  const compact = opts?.compact ?? false;
 
   const structureTemplate = taskType === "task1"
     ? `- **Task Achievement (TA):** [Nhận xét chi tiết: Overview đã làm rõ xu hướng chính chưa? Số liệu/đặc điểm đã được chọn lọc và so sánh tốt chưa hay chỉ liệt kê cơ học? (Với bài GT: Tone thư và 3 bullet points đã hoàn thành chưa?)]
@@ -46,7 +82,6 @@ export function buildSystemPrompt(taskType: TaskType, opts?: { compact?: boolean
 - **Lexical Resource (LR):** [Nhận xét chi tiết: Tính chính xác và đa dạng của từ vựng học thuật. Có dùng sai collocation hay bị dịch word-by-word từ tiếng Việt sang không?]
 - **Grammatical Range & Accuracy (GRA):** [Nhận xét chi tiết: Tỷ lệ câu không có lỗi (error-free sentences). Sự đa dạng trong cấu trúc câu (câu đơn, ghép, phức) có tự nhiên không hay gượng ép?]`;
 
-  // Model yếu (fallback): giới hạn khối lượng output để tránh JSON bị cắt cụt do maxTokens thấp
   const correctionsRule = compact
     ? `- Liệt kê TỐI ĐA 12 lỗi quan trọng nhất (ưu tiên lỗi ảnh hưởng band nhiều nhất, không cần quét từng câu một cách tuyệt đối). Nếu một loại lỗi lặp lại nhiều lần, gộp thành 1 mục và ghi rõ trong "explanation" là lỗi lặp lại.`
     : `- KHÔNG giới hạn số lượng lỗi. Bạn PHẢI đọc bao quát TOÀN BỘ bài viết từng dòng, từng đoạn.
