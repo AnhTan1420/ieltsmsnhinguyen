@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { getAuthHeader } from "@/lib/supabase";
 import type { SubmissionRow } from "@/lib/types";
 import { downloadSubmissionsZip } from "@/lib/teacher/exportDoc";
 
@@ -42,16 +42,25 @@ export function useBulkActions(submissions: SubmissionRow[], loadSubmissions: ()
     setError(null);
 
     const ids = Array.from(selectedIds);
-    const { error: deleteError } = await supabase.from("submissions").delete().in("id", ids);
 
-    setIsBulkDeleting(false);
+    try {
+      const response = await fetch("/api/submissions/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await getAuthHeader()) },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Không thể xóa các bài làm đã chọn.");
 
-    if (deleteError) return setError(deleteError.message);
-
-    onDeleted?.(ids);
-    setSelectedIds(new Set());
-    setSelectionMode(false);
-    void loadSubmissions();
+      onDeleted?.(ids);
+      setSelectedIds(new Set());
+      setSelectionMode(false);
+      void loadSubmissions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể xóa các bài làm đã chọn.");
+    } finally {
+      setIsBulkDeleting(false);
+    }
   };
 
   // Tải tất cả bài làm (zip) — nếu đang chọn nhiều thì chỉ zip các bài

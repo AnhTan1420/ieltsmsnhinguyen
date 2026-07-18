@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getAuthHeader } from "@/lib/supabase";
 import type { SubmissionRow } from "@/lib/types";
 import { GRADING_STEPS } from "@/components/teacher/GradingProgressModal";
 
@@ -85,7 +85,7 @@ export function useSubmissions(isAuthed: boolean) {
     try {
       const response = await fetch("/api/grade", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await getAuthHeader()) },
         body: JSON.stringify(payload),
       });
 
@@ -99,33 +99,54 @@ export function useSubmissions(isAuthed: boolean) {
     }
   };
 
+  // Xóa bài nộp: gọi qua API route (xác thực server-side), KHÔNG gọi thẳng
+  // supabase.from("submissions").delete() từ client nữa. Bảng submissions
+  // không có policy RLS cho phép ghi trực tiếp từ client (chỉ service-role
+  // key trong API route mới ghi được) — route bên dưới tự kiểm tra người gọi
+  // đã đăng nhập trước khi dùng service-role key để xóa.
   const handleDeleteSubmission = async (submission: SubmissionRow, onDeleted?: (id: string) => void) => {
     if (!window.confirm(`Xóa vĩnh viễn bài làm của học viên "${submission.student_name}"?`)) return;
 
     setIsDeleting(true);
     setError(null);
 
-    const { error: deleteError } = await supabase.from("submissions").delete().eq("id", submission.id);
-    setIsDeleting(false);
+    try {
+      const response = await fetch(`/api/submissions/${submission.id}`, {
+        method: "DELETE",
+        headers: { ...(await getAuthHeader()) },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Không thể xóa bài làm.");
 
-    if (deleteError) return setError(deleteError.message);
-    onDeleted?.(submission.id);
-    void loadSubmissions();
+      onDeleted?.(submission.id);
+      void loadSubmissions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể xóa bài làm.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-  // Lưu nhận xét bổ sung của giáo viên vào cột teacher_comment
+  // Lưu nhận xét bổ sung của giáo viên vào cột teacher_comment — cũng đi qua
+  // API route có xác thực thay vì update thẳng từ client, cùng lý do như trên.
   const handleSaveComment = async (submissionId: string, comment: string) => {
     setIsSavingComment(true);
     setError(null);
 
-    const { error: updateError } = await supabase
-      .from("submissions")
-      .update({ teacher_comment: comment })
-      .eq("id", submissionId);
-
-    setIsSavingComment(false);
-    if (updateError) setError(updateError.message);
-    else void loadSubmissions();
+    try {
+      const response = await fetch(`/api/submissions/${submissionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await getAuthHeader()) },
+        body: JSON.stringify({ teacher_comment: comment }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Không thể lưu nhận xét.");
+      void loadSubmissions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không thể lưu nhận xét.");
+    } finally {
+      setIsSavingComment(false);
+    }
   };
 
   return {

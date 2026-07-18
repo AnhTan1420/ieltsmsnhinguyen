@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { gradeSubmission } from "@/lib/grading";
+import { requireAuth } from "@/lib/auth-server";
 
 // TĂNG GIỚI HẠN THỜI GIAN CHẠY TRÊN VERCEL LÊN 60 GIÂY
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  // 0. BẢO MẬT: route này dùng service-role key (bỏ qua RLS) và gọi AI trả phí
+  // (Groq/Gemini) — bắt buộc phải là giáo viên đã đăng nhập mới được gọi.
+  // Trước đây endpoint này không kiểm tra gì cả: bất kỳ ai trên Internet, không
+  // cần đăng nhập, đều có thể POST tới đây với một submissionId bất kỳ để ghi
+  // đè điểm/nhận xét của MỌI bài nộp, đồng thời "đốt" quota API AI trả phí.
+  const auth = await requireAuth(request);
+  if (auth instanceof NextResponse) return auth;
+
   // 1. Nhận các tham số từ frontend gửi lên
   const { submissionId, content, testPrompt, taskType, task1Prompt, task2Prompt } = await request.json();
 
