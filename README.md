@@ -1,3 +1,23 @@
+## Project Structure
+components/teacher/
+  TeacherDashboard.tsx        (chỉ còn layout + tab state, ~150 dòng)
+  ExamCreateForm.tsx          (tab "Tạo đề thi" — handleSaveTest, handleImageUpload)
+  SubmissionList.tsx          (sidebar danh sách bài nộp + bulk select/delete/download)
+  SubmissionDetail.tsx        (panel chi tiết bài làm + hiển thị task1/task2)
+  GradingResultPanel.tsx      (card AI feedback, band, corrections diff)
+  GradingProgressModal.tsx    (modal "đang chấm điểm" + GRADING_STEPS)
+hooks/teacher/
+  useTeacherAuth.ts           (auth check hiện đang nằm rải trong component)
+  useTests.ts                 (loadTests, handleDeleteTest)
+  useSubmissions.ts           (loadSubmissions, handleGrade, handleDeleteSubmission, handleSaveComment)
+  useBulkActions.ts           (toggleSelectionMode/Id/All, handleBulkDelete, handleDownloadAll)
+lib/
+  grading/
+    prompt.ts                 (TASK_CONFIG, buildSystemPrompt — tách khỏi grading.ts)
+    provider.ts                (gọi Groq/Gemini)
+    parse.ts                   (parseSubmissionContent, parse response JSON)
+
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
