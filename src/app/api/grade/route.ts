@@ -1,12 +1,20 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { gradeSubmission } from "@/lib/grading";
+import { getAuthenticatedUser } from "@/lib/supabase-server";
 
 // TĂNG GIỚI HẠN THỜI GIAN CHẠY TRÊN VERCEL LÊN 60 GIÂY
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
+  // 0. Route này dùng service-role key (bypass RLS) và gọi AI có tính phí,
+  // nên bắt buộc phải là giáo viên đã đăng nhập mới được chấm bài.
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   // 1. Nhận các tham số từ frontend gửi lên
   const { submissionId, content, testPrompt, taskType, task1Prompt, task2Prompt } = await request.json();
 
