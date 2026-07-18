@@ -1,21 +1,23 @@
 ## Project Structure
-components/teacher/
-  TeacherDashboard.tsx        (chỉ còn layout + tab state, ~150 dòng)
-  ExamCreateForm.tsx          (tab "Tạo đề thi" — handleSaveTest, handleImageUpload)
-  SubmissionList.tsx          (sidebar danh sách bài nộp + bulk select/delete/download)
-  SubmissionDetail.tsx        (panel chi tiết bài làm + hiển thị task1/task2)
-  GradingResultPanel.tsx      (card AI feedback, band, corrections diff)
-  GradingProgressModal.tsx    (modal "đang chấm điểm" + GRADING_STEPS)
-hooks/teacher/
-  useTeacherAuth.ts           (auth check hiện đang nằm rải trong component)
-  useTests.ts                 (loadTests, handleDeleteTest)
-  useSubmissions.ts           (loadSubmissions, handleGrade, handleDeleteSubmission, handleSaveComment)
-  useBulkActions.ts           (toggleSelectionMode/Id/All, handleBulkDelete, handleDownloadAll)
-lib/
-  grading/
-    prompt.ts                 (TASK_CONFIG, buildSystemPrompt — tách khỏi grading.ts)
-    provider.ts                (gọi Groq/Gemini)
-    parse.ts                   (parseSubmissionContent, parse response JSON)
+src/
+├── components/teacher/         # Giao diện quản lý của giáo viên
+│   ├── TeacherDashboard.tsx    # Layout chính & quản lý Tab state
+│   ├── ExamCreateForm.tsx      # Chức năng tạo đề thi (upload, config)
+│   ├── SubmissionList.tsx      # Sidebar danh sách bài làm & tác vụ bulk
+│   ├── SubmissionDetail.tsx    # Xem chi tiết & so sánh Task 1/2
+│   ├── GradingResultPanel.tsx  # Hiển thị AI Feedback, Band score, Diff
+│   └── GradingProgressModal.tsx # Modal hiển thị tiến trình chấm điểm
+│
+├── hooks/teacher/              # Các Custom Hooks xử lý business logic
+│   ├── useTeacherAuth.ts       # Xác thực quyền truy cập
+│   ├── useTests.ts             # Quản lý vòng đời đề thi
+│   ├── useSubmissions.ts       # Quản lý logic bài nộp & chấm điểm
+│   └── useBulkActions.ts       # Xử lý các hành động hàng loạt (xóa, tải)
+│
+└── lib/grading/                # Core logic chấm điểm AI
+    ├── prompt.ts               # Định nghĩa Task Config & System Prompts
+    ├── provider.ts             # Kết nối & gọi API (Groq/Gemini)
+    └── parse.ts                # Xử lý nội dung input & parse JSON output
 
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
