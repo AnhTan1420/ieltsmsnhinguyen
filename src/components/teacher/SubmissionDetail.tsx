@@ -426,7 +426,7 @@ export default function SubmissionDetail({
                 <div className="bg-cyan-50 text-cyan-600 rounded-full p-1.5 shrink-0">
                   <Lightbulb className="h-3.5 w-3.5" />
                 </div>
-                <p className="text-sm font-semibold text-slate-800 leading-relaxed">
+                <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap">
                   "{activeCorrection.original}"
                 </p>
               </div>
@@ -438,11 +438,11 @@ export default function SubmissionDetail({
 
               <div>
                 <p className="text-xs font-bold text-slate-500 mb-2">Gợi ý:</p>
-                <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-700 leading-relaxed line-through decoration-red-300/60">
+                <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-700 leading-relaxed line-through decoration-red-300/60 whitespace-pre-wrap">
                   {activeCorrection.original}
                 </div>
                 <div className="flex justify-center py-1 text-slate-300">↓</div>
-                <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed">
+                <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed whitespace-pre-wrap">
                   {activeCorrection.corrected}
                 </div>
               </div>

@@ -157,11 +157,11 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
                           <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
-                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50">{correction.original}</p>
+                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50 whitespace-pre-wrap">{correction.original}</p>
                         </div>
                         <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
                           <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
-                          <p className="text-[14px] text-emerald-800 font-medium">{correction.corrected}</p>
+                          <p className="text-[14px] text-emerald-800 font-medium whitespace-pre-wrap">{correction.corrected}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
@@ -255,11 +255,11 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
                           <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
-                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50">{correction.original}</p>
+                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50 whitespace-pre-wrap">{correction.original}</p>
                         </div>
                         <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
                           <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
-                          <p className="text-[14px] text-emerald-800 font-medium">{correction.corrected}</p>
+                          <p className="text-[14px] text-emerald-800 font-medium whitespace-pre-wrap">{correction.corrected}</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
