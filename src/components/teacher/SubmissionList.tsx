@@ -37,7 +37,7 @@ export default function SubmissionList({
   onDownloadAll,
 }: SubmissionListProps) {
   return (
-    <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60 sticky top-6 max-h-[85vh] flex flex-col">
+    <div className="rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] flex flex-col">
       <div className="flex items-center justify-between pb-3 border-b border-slate-100">
         <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
           Bài làm <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-xs">{submissions.length}</span>
@@ -91,7 +91,7 @@ export default function SubmissionList({
         </div>
       </div>
 
-      <div className="space-y-3 overflow-y-auto pr-2 pb-2 custom-scrollbar mt-3">
+      <div className="space-y-3 lg:overflow-y-auto pr-1 lg:pr-2 pb-2 lg:custom-scrollbar mt-3">
         {submissions.length === 0 && (
           <div className="text-center py-12 px-4 border-2 border-dashed border-slate-100 rounded-2xl">
             <Clock className="mx-auto h-8 w-8 text-slate-300 mb-2" />
@@ -107,7 +107,7 @@ export default function SubmissionList({
                   e.stopPropagation();
                   toggleSelectId(submission.id);
                 }}
-                className="absolute top-4 right-4 z-10 p-1 rounded-md bg-white shadow-sm border border-slate-200"
+                className="absolute top-3.5 right-3.5 z-10 p-2 rounded-lg bg-white shadow-sm border border-slate-200 active:scale-95 transition-transform"
                 title="Chọn bài này"
               >
                 {selectedIds.has(submission.id) ? (

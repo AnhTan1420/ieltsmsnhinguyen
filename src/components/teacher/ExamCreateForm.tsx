@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, Check, Clock, Copy, Edit3, Image as ImageIcon, Loader2, Plus, Trash2, UploadCloud } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, Clock, Copy, Edit3, Image as ImageIcon, Loader2, Plus, Trash2, UploadCloud } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { TestRow } from "@/lib/types";
 import { useTests } from "@/hooks/teacher/useTests";
@@ -18,6 +18,12 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
   const [isSavingTest, setIsSavingTest] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Trên mobile, danh sách đề và form soạn/sửa đề không đủ chỗ hiện song song —
+  // dùng chính trạng thái editingTest (null = đang xem danh sách, có giá trị =
+  // đang soạn/sửa 1 đề) làm cờ chuyển "màn hình", giống điều hướng master-detail
+  // ở tab "Theo dõi & Chấm bài". Ở lg+ cả 2 cột luôn hiện song song như cũ.
+  const showEditorOnMobile = editingTest !== null;
 
   useEffect(() => {
     void loadTests();
@@ -84,53 +90,71 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
   };
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[1fr_450px] items-start">
-      <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200/60 sticky top-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-5">
-          <div>
+    <section className="grid gap-6 items-start lg:grid-cols-[1fr_450px]">
+      <div className={`${showEditorOnMobile ? "hidden lg:block" : "block"} rounded-3xl bg-white p-4 sm:p-6 shadow-sm border border-slate-200/60 lg:sticky lg:top-24`}>
+        <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-5 mb-5">
+          <div className="min-w-0">
             <h2 className="text-xl font-bold text-slate-900">Ngân hàng Đề thi</h2>
             <p className="text-sm text-slate-500 font-medium mt-1">Danh sách các đề IELTS Writing bạn đã tạo</p>
           </div>
           <button
             onClick={() => setEditingTest({ title: "", task1_prompt: "", task2_prompt: "", image_url: null })}
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm transition-all hover:shadow-md"
+            className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 sm:px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm transition-all hover:shadow-md"
           >
-            <Plus className="h-4 w-4" /> Soạn đề mới
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Soạn đề mới</span>
           </button>
         </div>
 
-        <div className="grid gap-4 max-h-[650px] overflow-y-auto pr-2 custom-scrollbar">
-          {tests.map((test) => (
-            <div key={test.id} className="p-5 border border-slate-200 rounded-2xl bg-white hover:border-cyan-300 hover:shadow-md transition-all group relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-1 h-full bg-slate-200 group-hover:bg-cyan-400 transition-colors"></div>
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-bold text-lg text-slate-800 group-hover:text-cyan-800 pl-2 pr-4">{test.title}</h3>
-                <div className="flex gap-1 bg-slate-50 rounded-lg p-1 border border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => setEditingTest(test)} className="p-2 text-slate-400 hover:text-cyan-600 hover:bg-white rounded-md transition" title="Sửa đề">
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteTest(test.id, (id) => setEditingTest((prev) => (prev?.id === id ? null : prev)))}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-white rounded-md transition"
-                    title="Xóa đề"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => copyTestLink(test.id)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-md transition" title="Copy Link">
-                    {copiedId === test.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
-                  </button>
+        {tests.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center text-slate-400">
+            <BookOpen className="h-8 w-8 mb-2 text-slate-300" />
+            <p className="text-sm font-medium">Chưa có đề thi nào. Bấm "Soạn đề mới" để bắt đầu.</p>
+          </div>
+        ) : (
+          <div className="grid gap-4 lg:max-h-[calc(100vh-16rem)] lg:overflow-y-auto pr-0 lg:pr-2 custom-scrollbar">
+            {tests.map((test) => (
+              <div key={test.id} className="p-4 sm:p-5 border border-slate-200 rounded-2xl bg-white hover:border-cyan-300 hover:shadow-md transition-all group relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-slate-200 group-hover:bg-cyan-400 transition-colors"></div>
+                <div className="flex justify-between items-start gap-2 mb-3">
+                  <h3 className="font-bold text-lg text-slate-800 group-hover:text-cyan-800 pl-2 pr-1 min-w-0 break-words">{test.title}</h3>
+                  {/* Luôn hiện sẵn (không chỉ khi hover) — trên cảm ứng không có hover ổn định */}
+                  <div className="flex shrink-0 gap-0.5 sm:gap-1 bg-slate-50 rounded-lg p-1 border border-slate-100">
+                    <button onClick={() => setEditingTest(test)} className="p-2 text-slate-400 hover:text-cyan-600 hover:bg-white rounded-md transition" title="Sửa đề">
+                      <Edit3 className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTest(test.id, (id) => setEditingTest((prev) => (prev?.id === id ? null : prev)))}
+                      className="p-2 text-slate-400 hover:text-red-600 hover:bg-white rounded-md transition"
+                      title="Xóa đề"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => copyTestLink(test.id)} className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-md transition" title="Copy Link">
+                      {copiedId === test.id ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+                <div className="pl-2 flex items-center gap-4 text-xs font-medium text-slate-500">
+                  <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {test.duration_minutes} phút</span>
+                  <span className="hidden sm:flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> Full Test (Task 1 & 2)</span>
                 </div>
               </div>
-              <div className="pl-2 flex items-center gap-4 text-xs font-medium text-slate-500">
-                <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {test.duration_minutes} phút</span>
-                <span className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> Full Test (Task 1 & 2)</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="rounded-3xl bg-white p-6 shadow-sm border border-slate-200/60 sticky top-6">
+      <div className={`${showEditorOnMobile ? "block" : "hidden lg:block"} rounded-3xl bg-white p-4 sm:p-6 shadow-sm border border-slate-200/60 lg:sticky lg:top-24`}>
+        {editingTest && (
+          <button
+            type="button"
+            onClick={() => setEditingTest(null)}
+            className="flex lg:hidden items-center gap-1.5 -mt-1 mb-4 text-sm font-bold text-slate-500 hover:text-slate-700"
+          >
+            <ArrowLeft className="h-4 w-4" /> Ngân hàng đề thi
+          </button>
+        )}
+
         <div className="border-b border-slate-100 pb-5 mb-6">
           <h2 className="text-xl font-bold text-slate-900">{editingTest?.id ? "Chỉnh sửa Đề thi" : "Khởi tạo Đề thi Mới"}</h2>
           <p className="text-sm text-slate-500 font-medium mt-1">
@@ -152,7 +176,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
               />
             </div>
 
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4 shadow-sm">
+            <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4 shadow-sm">
               <div className="flex items-center gap-2 font-black text-slate-800 text-base">
                 <ImageIcon className="h-5 w-5 text-cyan-600" /> Writing Task 1
               </div>
@@ -172,15 +196,14 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
                   <div className="mb-2 relative w-full h-40 rounded-xl border border-slate-200 overflow-hidden bg-white group">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={editingTest.image_url} alt="Task 1" className="object-contain w-full h-full p-2" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => setEditingTest({ ...editingTest, image_url: null })}
-                        className="bg-red-500 text-white rounded-full p-3 hover:bg-red-600 shadow-lg transform hover:scale-105 transition-all"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingTest({ ...editingTest, image_url: null })}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 shadow-lg transition-all"
+                      title="Xóa ảnh"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
                 ) : (
                   <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-slate-100 hover:border-cyan-300 bg-white border-slate-300 transition-all group">
@@ -190,7 +213,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
                       ) : (
                         <UploadCloud className="w-8 h-8 mb-2" />
                       )}
-                      <p className="text-xs font-bold">{isUploading ? "Đang tải ảnh lên máy chủ..." : "Click hoặc kéo thả ảnh vào đây"}</p>
+                      <p className="text-xs font-bold">{isUploading ? "Đang tải ảnh lên máy chủ..." : "Chạm để chọn ảnh từ thiết bị"}</p>
                     </div>
                     <input type="file" className="hidden" accept="image/png, image/jpeg" onChange={handleImageUpload} disabled={isUploading} />
                   </label>
@@ -198,7 +221,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200/80 space-y-4 shadow-sm">
+            <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4 shadow-sm">
               <div className="flex items-center gap-2 font-black text-slate-800 text-base">
                 <BookOpen className="h-5 w-5 text-cyan-600" /> Writing Task 2
               </div>
@@ -215,13 +238,13 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
             </div>
 
             <div className="flex gap-3 pt-4 border-t border-slate-100">
-              <button type="button" onClick={() => setEditingTest(null)} className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
+              <button type="button" onClick={() => setEditingTest(null)} className="flex-1 rounded-xl border border-slate-200 py-3.5 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">
                 Hủy bỏ
               </button>
               <button
                 type="submit"
                 disabled={isSavingTest}
-                className="flex-[2] rounded-xl bg-cyan-500 py-3 text-sm font-bold text-slate-900 hover:bg-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all disabled:opacity-50"
+                className="flex-[2] rounded-xl bg-cyan-500 py-3.5 text-sm font-bold text-slate-900 hover:bg-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all disabled:opacity-50"
               >
                 {isSavingTest ? "Đang lưu..." : "Lưu Đề thi"}
               </button>
@@ -231,7 +254,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
               <button
                 type="button"
                 onClick={() => copyTestLink(editingTest.id!)}
-                className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 py-3 text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-colors mt-2"
+                className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 py-3.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100 transition-colors mt-2"
               >
                 {copiedId === editingTest.id ? (
                   <>
