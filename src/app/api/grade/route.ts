@@ -10,9 +10,6 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   // 0. BẢO MẬT: route này dùng service-role key (bỏ qua RLS) và gọi AI trả phí
   // (Groq/Gemini) — bắt buộc phải là giáo viên đã đăng nhập mới được gọi.
-  // Trước đây endpoint này không kiểm tra gì cả: bất kỳ ai trên Internet, không
-  // cần đăng nhập, đều có thể POST tới đây với một submissionId bất kỳ để ghi
-  // đè điểm/nhận xét của MỌI bài nộp, đồng thời "đốt" quota API AI trả phí.
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
@@ -36,7 +33,8 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Missing task prompts for both tasks" }, { status: 400 });
       }
 
-      // Chấm song song cả 2 task
+      // Chấm song song cả 2 task — vẫn là 2 LẦN GỌI AI HOÀN TOÀN ĐỘC LẬP
+      // (mỗi lần chỉ thấy đúng 1 task), đúng ngữ cảnh "giám khảo chuyên biệt".
       const [feedback1, feedback2] = await Promise.all([
         gradeSubmission(content, task1Prompt, "task1"),
         gradeSubmission(content, task2Prompt, "task2")
@@ -53,7 +51,14 @@ export async function POST(request: Request) {
 
       feedback = {
         overall_band: overallBand,
-        examiner_summary: `### Task 1 Evaluation:\n${fb1.examiner_summary || "Không có nhận xét."}\n\n### Task 2 Evaluation:\n${fb2.examiner_summary || "Không có nhận xét."}`,
+        // Field cũ: KHÔNG còn tự chèn header "### Task N Evaluation:" nữa —
+        // chỉ nối 2 đoạn nhận xét cách nhau 1 dòng trống, thuần làm fallback
+        // cho bất kỳ chỗ nào còn đọc trực tiếp examiner_summary (không nên
+        // dùng field này để hiển thị chính, xem task1_summary/task2_summary).
+        examiner_summary: `${fb1.examiner_summary || "Không có nhận xét."}\n\n${fb2.examiner_summary || "Không có nhận xét."}`.trim(),
+        // Nhận xét TÁCH RIÊNG từng task — đây là field UI nên dùng để hiển thị.
+        task1_summary: fb1.examiner_summary || "Không có nhận xét.",
+        task2_summary: fb2.examiner_summary || "Không có nhận xét.",
         task1: fb1.task1 || {
           band: band1,
           TA: fb1.task1?.TA ?? fb1.TA,
@@ -68,16 +73,29 @@ export async function POST(request: Request) {
           LR: fb2.task2?.LR ?? fb2.LR,
           GRA: fb2.task2?.GRA ?? fb2.GRA,
         },
+        // Gắn nhãn "task" vào từng lỗi ngay khi merge — UI không còn phải
+        // đoán lỗi thuộc task nào bằng cách so khớp text nữa.
         corrections: [
-          ...(fb1.corrections || []),
-          ...(fb2.corrections || [])
-        ]
+          ...(fb1.corrections || []).map((c: any) => ({ ...c, task: "task1" as const })),
+          ...(fb2.corrections || []).map((c: any) => ({ ...c, task: "task2" as const })),
+        ],
       };
     } else {
       if (!testPrompt) {
         return NextResponse.json({ error: "Missing testPrompt" }, { status: 400 });
       }
-      feedback = await gradeSubmission(content, testPrompt, taskType);
+      const raw = (await gradeSubmission(content, testPrompt, taskType)) as any;
+
+      // Chấm 1 task riêng lẻ: vẫn gắn "task" vào corrections và điền
+      // task1_summary/task2_summary tương ứng, để UI dùng chung 1 logic đọc
+      // dữ liệu cho cả 2 trường hợp "both" và "chấm riêng 1 task".
+      feedback = {
+        ...raw,
+        corrections: (raw.corrections || []).map((c: any) => ({ ...c, task: taskType })),
+        ...(taskType === "task1"
+          ? { task1_summary: raw.examiner_summary }
+          : { task2_summary: raw.examiner_summary }),
+      };
     }
 
     // 3. Cập nhật kết quả chấm vào Supabase
@@ -97,22 +115,17 @@ export async function POST(request: Request) {
     return NextResponse.json(feedback);
 
   } catch (error: any) {
-    // 1. Log lỗi cực chi tiết lên Vercel Logs (Server-side)
     const technicalDetail = error instanceof Error ? error.message : String(error);
     console.error("❌ GRADING FAILED:", technicalDetail);
-    
-    // 2. Phân loại lỗi để phản hồi cho Frontend
-    // Lỗi Quota/Rate Limit (429) -> 503
-    // Lỗi khác -> 502
+
     const isAIOverload = /429|rate limit|quota|exceeded/i.test(technicalDetail);
 
-    // 3. Trả về phản hồi cho trình duyệt
     return NextResponse.json(
       {
         error: isAIOverload 
           ? "Hệ thống AI đang quá tải hoặc hết lượt dùng. Vui lòng thử lại sau hoặc liên hệ Anh Tân."
           : "Đã xảy ra lỗi hệ thống nghiêm trọng.",
-        detail: technicalDetail // DỮ LIỆU NÀY SẼ HIỆN Ở F12 CỦA BẠN
+        detail: technicalDetail
       },
       { status: isAIOverload ? 503 : 502 }
     );

@@ -5,16 +5,7 @@ import { AlertOctagon, Languages, Star, Lightbulb, Target, Link2, SpellCheck2, P
 type CriterionItem = { label: string; content: string };
 type DiagnosisItem = { label: string | null; content: string };
 
-type ParsedExaminerSummary = {
-  criteria: CriterionItem[];
-  diagnosis: DiagnosisItem[];
-};
-
-// ── Parser: tách chuỗi markdown cố định (từ prompt) thành dữ liệu có cấu trúc ──
-
 function splitBullets(block: string): string[] {
-  // Gộp các dòng tiếp nối (không bắt đầu bằng "- ") vào bullet trước đó,
-  // phòng trường hợp model xuống dòng giữa câu.
   const bullets: string[] = [];
   for (const rawLine of block.split("\n")) {
     const line = rawLine.trim();
@@ -34,7 +25,9 @@ function parseBulletLabel(bullet: string): DiagnosisItem {
   return { label: null, content: bullet };
 }
 
-export function parseExaminerSummary(raw: string): ParsedExaminerSummary {
+// Parse ĐÚNG 1 khối nhận xét của 1 task (đã được tách sẵn ở nơi gọi) thành
+// "1. Criteria" và "2. Diagnosis" theo template cố định trong prompt.
+export function parseExaminerSummary(raw: string): { criteria: CriterionItem[]; diagnosis: DiagnosisItem[] } {
   if (!raw) return { criteria: [], diagnosis: [] };
 
   const sections = raw.split(/\n(?=###\s)/).map((s) => s.trim());
@@ -50,7 +43,6 @@ export function parseExaminerSummary(raw: string): ParsedExaminerSummary {
   return { criteria, diagnosis };
 }
 
-// ── Render inline "**bold**" bên trong 1 đoạn text ──
 function renderInline(text: string) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
     part.startsWith("**") && part.endsWith("**") ? (
@@ -63,7 +55,6 @@ function renderInline(text: string) {
   );
 }
 
-// ── Icon + màu theo tên tiêu chí (TA/TR, CC, LR, GRA) ──
 function criterionIcon(label: string) {
   if (/Task Achievement|Task Response/i.test(label)) return { Icon: Target, color: "text-cyan-600", bg: "bg-cyan-100" };
   if (/Coherence/i.test(label)) return { Icon: Link2, color: "text-violet-600", bg: "bg-violet-100" };
@@ -71,7 +62,6 @@ function criterionIcon(label: string) {
   return { Icon: PenTool, color: "text-emerald-600", bg: "bg-emerald-100" };
 }
 
-// ── Icon + màu theo nhãn của diagnosis bullet ──
 function diagnosisStyle(label: string | null) {
   if (!label) return { Icon: Lightbulb, color: "text-cyan-700", bg: "bg-cyan-50", border: "border-cyan-200" };
   if (/Lỗi chí mạng/i.test(label)) return { Icon: AlertOctagon, color: "text-red-700", bg: "bg-red-50", border: "border-red-200" };

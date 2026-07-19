@@ -1,9 +1,9 @@
 "use client";
 
 import { AlertTriangle, BookOpen, Bot, Image as ImageIcon, Sparkles, Type } from "lucide-react";
-import type { GradingFeedback } from "@/lib/types";
-import { countMatchedCorrections, countWords } from "./submission-utils";
-import ExaminerSummaryCard from "./ExaminerSummaryCard"; // 👈 thêm dòng này
+import type { Correction, GradingFeedback } from "@/lib/types";
+import { countWords } from "./submission-utils";
+import ExaminerSummaryCard from "./ExaminerSummaryCard";
 
 type GradingResultPanelProps = {
   feedback: GradingFeedback;
@@ -11,7 +11,47 @@ type GradingResultPanelProps = {
   task2Answer?: string;
 };
 
+// Lấy đúng đoạn nhận xét của 1 task. Ưu tiên task1_summary/task2_summary (dữ
+// liệu mới, route.ts đã điền sẵn không kèm header). Với submission cũ lưu
+// trước khi có 2 field này, fallback: nếu examiner_summary có header
+// "### Task N Evaluation:" thì tách theo header; nếu không có header (record
+// cũ chỉ từng chấm 1 task) thì coi cả examiner_summary là của task đang hỏi.
+function resolveTaskSummary(feedback: GradingFeedback, task: "task1" | "task2"): string {
+  const direct = task === "task1" ? feedback.task1_summary : feedback.task2_summary;
+  if (direct) return direct;
+
+  const raw = feedback.examiner_summary || "";
+  const headerRegex = /^###\s*Task\s*\d[^\n]*$/gim;
+  const matches = [...raw.matchAll(headerRegex)];
+
+  if (matches.length === 0) return raw;
+
+  const match = matches.find((m) => (task === "task1" ? /1/.test(m[0]) : /2/.test(m[0])));
+  if (!match) return "";
+
+  const matchIdx = matches.indexOf(match);
+  const start = match.index ?? 0;
+  const end = matchIdx + 1 < matches.length ? matches[matchIdx + 1].index! : raw.length;
+  return raw.slice(start, end).replace(headerRegex, "").trim();
+}
+
+// Lọc corrections theo task. Ưu tiên field "task" đã gắn sẵn (dữ liệu mới).
+// Fallback cho record cũ chưa có field này: đoán bằng cách so khớp text gốc
+// của lỗi vào đúng bài làm của task đó.
+function resolveTaskCorrections(feedback: GradingFeedback, task: "task1" | "task2", answerText?: string): Correction[] {
+  const all = feedback.corrections ?? [];
+  const hasTags = all.some((c) => c.task);
+  if (hasTags) return all.filter((c) => c.task === task);
+  if (!answerText) return [];
+  return all.filter((c) => answerText.includes(c.original));
+}
+
 export default function GradingResultPanel({ feedback, task1Answer, task2Answer }: GradingResultPanelProps) {
+  const task1Summary = feedback.task1 ? resolveTaskSummary(feedback, "task1") : null;
+  const task2Summary = feedback.task2 ? resolveTaskSummary(feedback, "task2") : null;
+  const task1Corrections = feedback.task1 ? resolveTaskCorrections(feedback, "task1", task1Answer) : [];
+  const task2Corrections = feedback.task2 ? resolveTaskCorrections(feedback, "task2", task2Answer) : [];
+
   return (
     <div className="mt-8 rounded-3xl border border-cyan-200/60 bg-gradient-to-br from-cyan-50/80 to-white overflow-hidden shadow-sm">
       <div className="p-6 border-b border-cyan-100 bg-white/50 backdrop-blur-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -30,58 +70,48 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
         </div>
       </div>
 
-      <div className="p-6 space-y-8">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[
-            { label: "Task 1", text: task1Answer, icon: <ImageIcon className="h-3.5 w-3.5" /> },
-            { label: "Task 2", text: task2Answer, icon: <BookOpen className="h-3.5 w-3.5" /> },
-          ].map((task) => {
-            const errorCount = countMatchedCorrections(task.text, feedback.corrections ?? []);
-            return (
-              <div key={task.label} className="rounded-2xl bg-white border border-slate-200/60 shadow-sm p-4 space-y-3">
-                <p className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-                  {task.icon} {task.label}
-                </p>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="bg-slate-100 p-1.5 rounded-lg shrink-0"><Type className="h-3.5 w-3.5 text-slate-500" /></div>
-                    <div>
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số từ</p>
-                      <p className="text-base font-black text-slate-900">
-                        {countWords(task.text)} <span className="text-[10px] font-medium text-slate-400">từ</span>
-                      </p>
-                    </div>
-                  </div>
-                  {(feedback.corrections?.length ?? 0) > 0 && (
-                    <div className="flex items-center gap-2">
-                      <div className="bg-amber-100 p-1.5 rounded-lg shrink-0"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
-                      <div>
-                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số lỗi</p>
-                        <p className="text-base font-black text-slate-900">
-                          {errorCount} <span className="text-[10px] font-medium text-slate-400">lỗi</span>
-                        </p>
-                      </div>
-                    </div>
-                  )}
+      <div className="p-6 space-y-10">
+        {/* Task 1 */}
+        {feedback.task1 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-slate-900 text-white text-xs font-black px-3 py-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                <ImageIcon className="h-3.5 w-3.5" /> Task 1
+              </span>
+              <span className="rounded-full bg-cyan-100 text-cyan-800 text-xs font-bold px-3 py-1">
+                Band {feedback.task1.band}
+              </span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm p-4 flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-100 p-1.5 rounded-lg shrink-0"><Type className="h-3.5 w-3.5 text-slate-500" /></div>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số từ</p>
+                  <p className="text-base font-black text-slate-900">
+                    {countWords(task1Answer)} <span className="text-[10px] font-medium text-slate-400">từ</span>
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
+              {task1Corrections.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="bg-amber-100 p-1.5 rounded-lg shrink-0"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số lỗi</p>
+                    <p className="text-base font-black text-slate-900">
+                      {task1Corrections.length} <span className="text-[10px] font-medium text-slate-400">lỗi</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
 
-        {/* 👇 Thay khối <p> markdown thô bằng card có cấu trúc */}
-        <ExaminerSummaryCard summary={feedback.examiner_summary} />
+            {task1Summary && <ExaminerSummaryCard summary={task1Summary} />}
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          {feedback.task1 && (
-            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden hover:border-cyan-300 transition-colors">
-              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                <span className="font-bold text-slate-800 flex items-center gap-2">
-                  <ImageIcon className="h-4 w-4 text-slate-400" /> Task 1
-                </span>
-                <span className="rounded-full bg-cyan-100 text-cyan-800 text-xs font-bold px-3 py-1">
-                  Band {feedback.task1.band}
-                </span>
+            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+                <span className="font-bold text-slate-800">Điểm chi tiết</span>
               </div>
               <div className="p-5">
                 <dl className="space-y-3 text-sm">
@@ -103,17 +133,78 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                 </dl>
               </div>
             </div>
-          )}
 
-          {feedback.task2 && (
-            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden hover:border-cyan-300 transition-colors">
-              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
-                <span className="font-bold text-slate-800 flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-slate-400" /> Task 2
-                </span>
-                <span className="rounded-full bg-cyan-100 text-cyan-800 text-xs font-bold px-3 py-1">
-                  Band {feedback.task2.band}
-                </span>
+            {task1Corrections.length > 0 && (
+              <div>
+                <h4 className="font-black text-slate-900 mb-4 text-lg">Lỗi sai & Đề xuất sửa</h4>
+                <div className="space-y-4">
+                  {task1Corrections.map((correction, index) => (
+                    <div key={index} className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
+                          <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
+                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50">{correction.original}</p>
+                        </div>
+                        <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
+                          <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
+                          <p className="text-[14px] text-emerald-800 font-medium">{correction.corrected}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
+                        <Bot className="h-5 w-5 shrink-0 text-cyan-600 mt-0.5" />
+                        <p className="text-sm text-slate-600 leading-relaxed font-medium">{correction.explanation}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {feedback.task1 && feedback.task2 && <div className="border-t border-slate-100" />}
+
+        {/* Task 2 */}
+        {feedback.task2 && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <span className="rounded-lg bg-slate-900 text-white text-xs font-black px-3 py-1.5 uppercase tracking-wider flex items-center gap-1.5">
+                <BookOpen className="h-3.5 w-3.5" /> Task 2
+              </span>
+              <span className="rounded-full bg-cyan-100 text-cyan-800 text-xs font-bold px-3 py-1">
+                Band {feedback.task2.band}
+              </span>
+              <div className="h-px flex-1 bg-slate-200" />
+            </div>
+
+            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm p-4 flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <div className="bg-slate-100 p-1.5 rounded-lg shrink-0"><Type className="h-3.5 w-3.5 text-slate-500" /></div>
+                <div>
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số từ</p>
+                  <p className="text-base font-black text-slate-900">
+                    {countWords(task2Answer)} <span className="text-[10px] font-medium text-slate-400">từ</span>
+                  </p>
+                </div>
+              </div>
+              {task2Corrections.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <div className="bg-amber-100 p-1.5 rounded-lg shrink-0"><AlertTriangle className="h-3.5 w-3.5 text-amber-600" /></div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Số lỗi</p>
+                    <p className="text-base font-black text-slate-900">
+                      {task2Corrections.length} <span className="text-[10px] font-medium text-slate-400">lỗi</span>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {task2Summary && <ExaminerSummaryCard summary={task2Summary} />}
+
+            <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+                <span className="font-bold text-slate-800">Điểm chi tiết</span>
               </div>
               <div className="p-5">
                 <dl className="space-y-3 text-sm">
@@ -135,40 +226,32 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                 </dl>
               </div>
             </div>
-          )}
-        </div>
 
-        {feedback.corrections && feedback.corrections.length > 0 && (
-          <div className="pt-4">
-            <h4 className="font-black text-slate-900 mb-4 text-lg flex items-center gap-2">
-              Lỗi sai & Đề xuất sửa
-            </h4>
-            <div className="space-y-4">
-              {feedback.corrections.map((correction: any, index: number) => (
-                <div key={index} className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
-                      <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
-                      <p className="text-[14px] text-red-700 line-through decoration-red-300/50">
-                        {correction.original}
-                      </p>
+            {task2Corrections.length > 0 && (
+              <div>
+                <h4 className="font-black text-slate-900 mb-4 text-lg">Lỗi sai & Đề xuất sửa</h4>
+                <div className="space-y-4">
+                  {task2Corrections.map((correction, index) => (
+                    <div key={index} className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
+                          <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
+                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50">{correction.original}</p>
+                        </div>
+                        <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
+                          <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
+                          <p className="text-[14px] text-emerald-800 font-medium">{correction.corrected}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
+                        <Bot className="h-5 w-5 shrink-0 text-cyan-600 mt-0.5" />
+                        <p className="text-sm text-slate-600 leading-relaxed font-medium">{correction.explanation}</p>
+                      </div>
                     </div>
-                    <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
-                      <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
-                      <p className="text-[14px] text-emerald-800 font-medium">
-                        {correction.corrected}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
-                    <Bot className="h-5 w-5 shrink-0 text-cyan-600 mt-0.5" />
-                    <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                      {correction.explanation}
-                    </p>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
