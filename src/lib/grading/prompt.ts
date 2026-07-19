@@ -142,8 +142,14 @@ ${structureTemplate}
 - **Lỗi chí mạng nhất:** [Chỉ ra nhóm lỗi CÓ TẦN SUẤT CAO NHẤT đang kéo overall xuống. VD: "Sai lỗi hòa hợp chủ-vị chiếm 40%", "Lạm dụng mạo từ 'the'".]
 - **Tư duy dịch thuật (L1 Interference):** [Chỉ ra 1-2 lỗi dùng từ/cấu trúc do tư duy dịch word-by-word từ Tiếng Việt sang.]
 - **Điểm sáng (nếu có):** [Liệt kê ngắn gọn 1-2 từ vựng/cấu trúc khó mà thí sinh đã dùng tốt. Nếu bài quá cơ bản, ghi rõ: "Chưa nổi bật".]
-- Nêu rõ nhóm lỗi hoặc điểm yếu nói trên đang trực tiếp "giam chân" hoặc kéo sập tiêu chí nào trong biểu điểm xuống Band mấy (VD: "Sự thiếu hụt các từ nối phân cấp (Cohesive devices) ở Body 2 đang giữ tiêu chí CC ở mức Band 6.0, dù từ vựng xứng đáng Band 7.0").
+- Nêu rõ nhóm lỗi hoặc điểm yếu nói trên đang trực tiếp "giam chân" hoặc kéo sập tiêu chí nào trong biểu điểm xuống Band mấy (VD: "Sự thiếu hụt các từ nối phân cấp (Cohesive devices) ở Body 2 đang giữ tiêu chí CC ở mức Band 6.0, dù từ vựng xứng đáng Band 7.0"). Câu này là VĂN XUÔI NỐI TIẾP 3 bullet trên, TUYỆT ĐỐI KHÔNG được tách thành 1 bullet "- **[Nhãn tự đặt]:**" mới (VD KHÔNG được viết "- **Nhận xét:** ...").
    => Nhận xét PHẢI CÁ NHÂN HÓA cho bài viết này, nhắc tên chủ đề bài viết.
+
+⛔ QUY TẮC NHẤT QUÁN SỐ LIỆU (TUYỆT ĐỐI, VI PHẠM LÀ LỖI NGHIÊM TRỌNG):
+- TUYỆT ĐỐI KHÔNG được nhắc lại con số Band TỔNG KẾT (overall band của task này) dưới bất kỳ hình thức nào trong "examiner_summary" (không viết "đạt band X.X", "band X.X vững chắc", "ở mức Band X.X" khi đang nói về band tổng thể) — con số này ĐÃ được hiển thị riêng ở giao diện, nhắc lại trong văn xuôi chỉ tạo rủi ro lệch số với "band" bạn tính ở field JSON.
+- Bạn CHỈ được nhắc số Band cụ thể khi đang nói về MỘT tiêu chí riêng lẻ đang bị kìm hãm (VD: "giữ CC ở mức Band 6.0") — KHÔNG BAO GIỜ dùng để tóm tắt band tổng của cả task.
+- TRƯỚC KHI xuất JSON, tự kiểm tra lại: nếu "examiner_summary" có nhắc bất kỳ con số Band nào, con số đó phải khớp với ĐÚNG MỘT trong các giá trị bạn đã chấm ở "${t.criterionKey}"/"CC"/"LR"/"GRA" — không được là một con số bịa ra không khớp với bất kỳ tiêu chí nào đã chấm.
+
 TUYỆT ĐỐI CẤM sử dụng các câu nhận xét sáo rỗng, mang tính bao quát bề mặt (VD: "Bài viết tốt", "Còn vài lỗi ngữ pháp"). Nhận xét phải mang tính "Bắt bệnh và Chẩn đoán chuyên sâu" (Diagnostic Review) dựa trên biểu điểm IELTS Band Descriptors.
 
 7. Band số nguyên/nửa điểm (1.0–9.0, bước 0.5) cho từng tiêu chí (${t.criterionLabel}/${t.criterionKey}, CC, LR, GRA).
