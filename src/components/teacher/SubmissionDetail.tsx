@@ -387,97 +387,105 @@ export default function SubmissionDetail({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-3 pt-6 border-t border-slate-200">
-                {/* Cụm nút chấm điểm đa lựa chọn: Chấm cả 2 Task hoặc Chấm riêng lẻ */}
-                <div className="flex w-full sm:w-auto items-stretch sm:items-center rounded-xl bg-slate-900 border border-slate-800 overflow-hidden shadow-sm">
-                  <button
-                    onClick={() => onGrade(selectedSubmission, "both")}
-                    disabled={isGrading || selectedSubmission.status === "in_progress" || !selectedSubmission.content}
-                    className="flex flex-1 sm:flex-none items-center justify-center gap-2 bg-slate-950 hover:bg-slate-900 text-white px-4 sm:px-5 py-3 text-sm font-bold transition disabled:opacity-50"
-                    title="Chấm cả hai bài cùng lúc và tính trung bình cộng điểm Overall"
-                  >
-                    {isGrading ? <Loader2 className="h-4 w-4 animate-spin shrink-0" /> : <Bot className="h-4 w-4 text-cyan-400 animate-pulse shrink-0" />}
-                    <span className="whitespace-nowrap">{selectedSubmission.feedback ? "AI Chấm lại cả 2 Task" : "AI Chấm cả 2 Task"}</span>
-                  </button>
+              <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 pt-6 border-t border-slate-200">
+
+                {/* Nút chính: Chấm cả 2 Task - Ưu tiên hiển thị nổi bật nhất */}
+                <button
+                  onClick={() => onGrade(selectedSubmission, "both")}
+                  disabled={isGrading || selectedSubmission.status === "in_progress" || !selectedSubmission.content}
+                  className="flex w-full sm:w-auto items-center justify-center gap-2 bg-slate-900 hover:bg-black text-white px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Chấm cả hai bài cùng lúc và tính trung bình cộng điểm Overall"
+                >
+                  {isGrading ? (
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" />
+                  ) : (
+                    <Bot className="h-4 w-4 text-cyan-400 animate-pulse shrink-0" />
+                  )}
+                  <span>{selectedSubmission.feedback ? "AI Chấm lại cả 2 Task" : "AI Chấm cả 2 Task"}</span>
+                </button>
+
+                {/* Cụm nút phụ: Chấm riêng lẻ - Giao diện sáng (Outline) để phân biệt hoàn toàn với nút chính */}
+                <div className="flex w-full sm:w-auto items-center gap-3">
                   <button
                     onClick={() => onGrade(selectedSubmission, "task1")}
                     disabled={isGrading || selectedSubmission.status === "in_progress" || !selectedSubmission.content}
-                    className="flex-1 sm:flex-none bg-slate-900 hover:bg-slate-800 text-slate-300 border-l border-slate-800/60 px-3 sm:px-3.5 py-3 text-xs font-semibold transition disabled:opacity-50 whitespace-nowrap"
+                    className="flex-1 sm:flex-none flex justify-center bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                     title="Chấm đơn lẻ chỉ đề bài Task 1"
                   >
                     Chấm riêng Task 1
                   </button>
+
                   <button
                     onClick={() => onGrade(selectedSubmission, "task2")}
                     disabled={isGrading || selectedSubmission.status === "in_progress" || !selectedSubmission.content}
-                    className="flex-1 sm:flex-none bg-slate-900 hover:bg-slate-800 text-slate-300 border-l border-slate-800/60 px-3 sm:px-3.5 py-3 text-xs font-semibold transition disabled:opacity-50 whitespace-nowrap"
+                    className="flex-1 sm:flex-none flex justify-center bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 px-4 py-2.5 rounded-lg text-sm font-medium shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                     title="Chấm đơn lẻ chỉ đề bài Task 2"
                   >
                     Chấm riêng Task 2
                   </button>
                 </div>
 
-                <button
-                  onClick={handleDownloadDoc}
-                  disabled={!selectedSubmission.content}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-cyan-700 hover:border-cyan-200 disabled:opacity-50 w-full sm:w-auto"
-                >
-                  <FileDown className="h-4 w-4" /> Xuất File DOC
-                </button>
+              <button
+                onClick={handleDownloadDoc}
+                disabled={!selectedSubmission.content}
+                className="flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 hover:text-cyan-700 hover:border-cyan-200 disabled:opacity-50 w-full sm:w-auto"
+              >
+                <FileDown className="h-4 w-4" /> Xuất File DOC
+              </button>
 
-                <button
-                  onClick={() => onDeleteSubmission(selectedSubmission)}
-                  disabled={isDeleting}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50 w-full sm:w-auto sm:ml-auto"
-                >
-                  <Trash2 className="h-4 w-4" /> Xóa bài
-                </button>
+              <button
+                onClick={() => onDeleteSubmission(selectedSubmission)}
+                disabled={isDeleting}
+                className="flex items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 transition hover:bg-red-100 disabled:opacity-50 w-full sm:w-auto sm:ml-auto"
+              >
+                <Trash2 className="h-4 w-4" /> Xóa bài
+              </button>
 
-                {selectedSubmission.status === "in_progress" && (
-                  <div className="w-full mt-2 flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-100/50 p-3 rounded-xl border border-slate-200 border-dashed">
-                    <Clock className="h-4 w-4 shrink-0" /> Hệ thống đang chờ học sinh ấn nút nộp bài để có thể chấm điểm.
-                  </div>
-                )}
-              </div>
-
-              {/* Nhận xét bổ sung của giáo viên */}
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-3">
-                <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <FileCheck2 className="h-4 w-4 text-slate-500" /> Nhận xét bổ sung của giáo viên
-                </label>
-                <textarea
-                  rows={4}
-                  className="w-full rounded-xl border border-slate-300 p-3 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all resize-none shadow-sm"
-                  placeholder="Viết nhận xét cho học sinh..."
-                  value={teacherCommentDraft}
-                  onChange={(e) => setTeacherCommentDraft(e.target.value)}
-                />
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => onSaveComment(selectedSubmission.id, teacherCommentDraft)}
-                    disabled={isSavingComment}
-                    className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-500 shadow-sm transition disabled:opacity-50 w-full sm:w-auto"
-                  >
-                    {isSavingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-                    Gửi nhận xét
-                  </button>
+              {selectedSubmission.status === "in_progress" && (
+                <div className="w-full mt-2 flex items-center gap-2 text-xs font-medium text-slate-500 bg-slate-100/50 p-3 rounded-xl border border-slate-200 border-dashed">
+                  <Clock className="h-4 w-4 shrink-0" /> Hệ thống đang chờ học sinh ấn nút nộp bài để có thể chấm điểm.
                 </div>
-              </div>
-
-              {/* AI Feedback UI Premium */}
-              {selectedSubmission.feedback && (
-                <GradingResultPanel
-                  feedback={selectedSubmission.feedback}
-                  task1Answer={parsedContent.task1Answer}
-                  task2Answer={parsedContent.task2Answer}
-                />
               )}
             </div>
+
+            {/* Nhận xét bổ sung của giáo viên */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm space-y-3">
+              <label className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <FileCheck2 className="h-4 w-4 text-slate-500" /> Nhận xét bổ sung của giáo viên
+              </label>
+              <textarea
+                rows={4}
+                className="w-full rounded-xl border border-slate-300 p-3 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all resize-none shadow-sm"
+                placeholder="Viết nhận xét cho học sinh..."
+                value={teacherCommentDraft}
+                onChange={(e) => setTeacherCommentDraft(e.target.value)}
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() => onSaveComment(selectedSubmission.id, teacherCommentDraft)}
+                  disabled={isSavingComment}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white hover:bg-emerald-500 shadow-sm transition disabled:opacity-50 w-full sm:w-auto"
+                >
+                  {isSavingComment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  Gửi nhận xét
+                </button>
+              </div>
+            </div>
+
+            {/* AI Feedback UI Premium */}
+            {selectedSubmission.feedback && (
+              <GradingResultPanel
+                feedback={selectedSubmission.feedback}
+                task1Answer={parsedContent.task1Answer}
+                task2Answer={parsedContent.task2Answer}
+              />
+            )}
+          </div>
           </div>
         )}
-      </div>
+    </div >
 
-      {hasCorrections && (
+      { hasCorrections && (
         <>
           {/* Panel "Chi tiết phản hồi" trên desktop — cột thứ 3 cố định, cuộn riêng */}
           <div className="hidden lg:flex lg:flex-col rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar">
@@ -494,15 +502,13 @@ export default function SubmissionDetail({
             aria-hidden={!activeCorrection}
           >
             <div
-              className={`absolute inset-0 bg-slate-950/50 transition-opacity duration-300 ${
-                activeCorrection ? "opacity-100" : "opacity-0"
-              }`}
+              className={`absolute inset-0 bg-slate-950/50 transition-opacity duration-300 ${activeCorrection ? "opacity-100" : "opacity-0"
+                }`}
               onClick={() => setActiveCorrection(null)}
             />
             <div
-              className={`absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto custom-scrollbar rounded-t-3xl bg-white p-5 pb-8 shadow-2xl transition-transform duration-300 ${
-                activeCorrection ? "translate-y-0" : "translate-y-full"
-              }`}
+              className={`absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto custom-scrollbar rounded-t-3xl bg-white p-5 pb-8 shadow-2xl transition-transform duration-300 ${activeCorrection ? "translate-y-0" : "translate-y-full"
+                }`}
             >
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
@@ -522,7 +528,8 @@ export default function SubmissionDetail({
             </div>
           </div>
         </>
-      )}
+      )
+}
     </>
   );
 }
