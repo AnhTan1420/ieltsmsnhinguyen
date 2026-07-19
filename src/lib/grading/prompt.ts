@@ -142,7 +142,7 @@ ${structureTemplate}
 - **Lỗi chí mạng nhất:** [Chỉ ra nhóm lỗi CÓ TẦN SUẤT CAO NHẤT đang kéo overall xuống. VD: "Sai lỗi hòa hợp chủ-vị chiếm 40%", "Lạm dụng mạo từ 'the'".]
 - **Tư duy dịch thuật (L1 Interference):** [Chỉ ra 1-2 lỗi dùng từ/cấu trúc do tư duy dịch word-by-word từ Tiếng Việt sang.]
 - **Điểm sáng (nếu có):** [Liệt kê ngắn gọn 1-2 từ vựng/cấu trúc khó mà thí sinh đã dùng tốt. Nếu bài quá cơ bản, ghi rõ: "Chưa nổi bật". CHỈ viết về điểm sáng, KHÔNG viết thêm câu kết luận nào khác vào bullet này.]
-- **Nhận xét tổng quan:** [MỘT đoạn 1-2 câu, PHẢI CÁ NHÂN HÓA, nhắc tên chủ đề bài viết, nêu rõ nhóm lỗi/điểm yếu ở trên đang trực tiếp "giam chân" tiêu chí nào.]
+- **Nhận xét tổng quan:** [MỘT đoạn 1-2 câu, PHẢI CÁ NHÂN HÓA, nhắc tên chủ đề bài viết, Nêu rõ nhóm lỗi hoặc điểm yếu nói trên đang trực tiếp "giam chân" hoặc kéo sập tiêu chí nào trong biểu điểm xuống Band mấy (VD: "Sự thiếu hụt các từ nối phân cấp (Cohesive devices) ở Body 2 đang giữ tiêu chí CC ở mức Band 6.0, dù từ vựng xứng đáng Band 7.0").]
 
 ⛔ QUY TẮC BẮT BUỘC VỀ SỐ LƯỢNG BULLET: Mục 2 PHẢI có ĐÚNG 4 bullet (mỗi bullet bắt đầu bằng "- **") — không được gộp 2 ý vào 1 bullet, không được thêm bullet thứ 5.
 
