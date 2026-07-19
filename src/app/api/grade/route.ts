@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const auth = await requireAuth(request);
   if (auth instanceof NextResponse) return auth;
 
-  const { submissionId, content, testPrompt, taskType, task1Prompt, task2Prompt } = await request.json();
+  const { submissionId, content, testPrompt, taskType, task1Prompt, task2Prompt, task1ImageUrl } = await request.json();
 
   if (!submissionId || !content || !taskType) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       }
 
       const [feedback1, feedback2] = await Promise.all([
-        gradeSubmission(content, task1Prompt, "task1"),
+        gradeSubmission(content, task1Prompt, "task1", task1ImageUrl),
         gradeSubmission(content, task2Prompt, "task2")
       ]);
 
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
       if (!testPrompt) {
         return NextResponse.json({ error: "Missing testPrompt" }, { status: 400 });
       }
-      const raw = (await gradeSubmission(content, testPrompt, taskType)) as any;
+      const raw = (await gradeSubmission(content, testPrompt, taskType, task1ImageUrl)) as any;
 
       const criterionKey = taskType === "task1" ? "TA" : "TR";
       const criterionScore = raw.task1?.[criterionKey] ?? raw.task2?.[criterionKey] ?? raw[criterionKey];

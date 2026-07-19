@@ -78,8 +78,14 @@ export function useSubmissions(isAuthed: boolean) {
     if (taskType === "both") {
       payload.task1Prompt = submission.tests.task1_prompt;
       payload.task2Prompt = submission.tests.task2_prompt;
+      // Ảnh biểu đồ/bảng/bản đồ gốc của Task 1 (nếu đề có upload) — gửi kèm để
+      // AI đối chiếu số liệu học sinh viết với số liệu thật trong ảnh.
+      payload.task1ImageUrl = submission.tests.image_url;
     } else {
       payload.testPrompt = taskType === "task1" ? submission.tests.task1_prompt : submission.tests.task2_prompt;
+      if (taskType === "task1") {
+        payload.task1ImageUrl = submission.tests.image_url;
+      }
     }
 
     try {

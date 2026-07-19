@@ -63,7 +63,30 @@ SCHEMA:
 }`;
 }
 
-export function buildSystemPrompt(taskType: TaskType, opts?: { mode?: PromptMode }): string {
+// Khối hướng dẫn đối chiếu ảnh biểu đồ gốc — CHỈ chèn khi taskType === "task1"
+// VÀ thực sự có ảnh đính kèm trong request gửi lên Gemini (xem provider.ts).
+// Nếu không có ảnh, chèn khối cảnh báo ngược lại để model không "ảo giác"
+// là đã kiểm chứng được số liệu trong khi thực ra chỉ đang đọc chữ mô tả.
+function buildImageCrossCheckBlock(hasImage: boolean): string {
+  if (hasImage) {
+    return `
+
+🖼️ ĐỐI CHIẾU ẢNH BIỂU ĐỒ/BẢNG/BẢN ĐỒ GỐC (BẮT BUỘC — ảnh đề gốc đã được đính kèm trong tin nhắn này):
+- Ảnh đính kèm chính là biểu đồ/bảng/quy trình/bản đồ GỐC của đề Task 1 này. Đọc kỹ số liệu, nhãn trục, chú thích, đơn vị trong ảnh TRƯỚC khi chấm TA.
+- Đối chiếu TỪNG số liệu/xu hướng học sinh nêu trong bài với số liệu thực tế trong ảnh (chấp nhận sai số làm tròn nhỏ, vd 29% học sinh viết "gần 30%").
+- Nếu học sinh BỊA số liệu không có trong ảnh, hoặc nêu SAI xu hướng/số liệu so với ảnh gốc → đây là lỗi Task Achievement NGHIÊM TRỌNG (data fabrication/misrepresentation). PHẢI nêu rõ trong "examiner_summary" (ưu tiên đưa vào bullet "Lỗi chí mạng nhất" nếu đây là lỗi nổi bật nhất) và áp mức trừ điểm TA tương ứng theo band descriptor thật — TUYỆT ĐỐI không bỏ qua hoặc du di.
+- Kiểm tra học sinh có bỏ sót đặc điểm/xu hướng nổi bật quan trọng nào thấy rõ trong ảnh nhưng không hề được đề cập trong bài không — đây cũng là điểm trừ TA.
+- Nếu ảnh bị mờ/cắt/không đọc rõ được số liệu, ghi chú rõ điều này trong "examiner_summary" và chỉ chấm TA dựa trên tính hợp lý nội tại của bài viết, KHÔNG suy diễn số liệu ảnh không thấy rõ.`;
+  }
+  return `
+
+⚠️ LƯU Ý QUAN TRỌNG: Đề Task 1 này KHÔNG có ảnh biểu đồ/bảng/bản đồ gốc đính kèm trong tin nhắn — bạn CHỈ nhìn thấy phần mô tả bằng chữ của đề bài và bài làm của học sinh, KHÔNG có cách nào xác minh số liệu học sinh nêu ra có đúng với biểu đồ gốc hay không. Do đó: chấm TA dựa trên tính hợp lý/nhất quán nội tại của bài viết (số liệu có tự mâu thuẫn giữa các đoạn không, overview có khớp với phần thân bài không), TUYỆT ĐỐI không khẳng định trong "examiner_summary" rằng số liệu "đúng" hay "sai" so với đề gốc vì bạn không có căn cứ để khẳng định điều đó.`;
+}
+
+export function buildSystemPrompt(
+  taskType: TaskType,
+  opts?: { mode?: PromptMode; hasImage?: boolean },
+): string {
   const mode = opts?.mode ?? "full";
 
   if (mode === "minimal") return buildMinimalPrompt(taskType);
@@ -113,6 +136,7 @@ Tuyệt đối KHÔNG sử dụng các câu văn sáo rỗng, thảo mai. BẠN 
 - Nhắc đến / đánh giá nội dung của ${oppositeTask} (CẤM TUYỆT ĐỐI ẢO GIÁC GỘP TASK).
 
 ${t.promptAnalysis}
+${taskType === "task1" ? buildImageCrossCheckBlock(Boolean(opts?.hasImage)) : ""}
 
 ⚠️ NHÁNH XỬ LÝ ĐẦU VÀO BẤT THƯỜNG (kiểm tra TRƯỚC khi chấm điểm):
 - Nếu nội dung nộp vào rõ ràng KHÔNG phải bài làm (ví dụ: học sinh dán nhầm đề bài, dán hướng dẫn, hoặc văn bản không liên quan gì đến chủ đề đề bài), KHÔNG được cố chấm điểm như bình thường. Thay vào đó, đặt "overall_band": 0, để "task1"/"task2" (tuỳ loại) với các tiêu chí = 0, và giải thích rõ lý do trong "examiner_summary".
