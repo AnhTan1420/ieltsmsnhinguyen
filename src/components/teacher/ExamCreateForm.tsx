@@ -62,7 +62,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
       task1_prompt: editingTest.task1_prompt || "",
       task2_prompt: editingTest.task2_prompt || "",
       image_url: editingTest.image_url || null,
-      duration_minutes: 60,
+      duration_minutes: editingTest.duration_minutes && editingTest.duration_minutes > 0 ? editingTest.duration_minutes : 60,
     };
 
     let responseError = null;
@@ -98,7 +98,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
             <p className="text-sm text-slate-500 font-medium mt-1">Danh sách các đề IELTS Writing bạn đã tạo</p>
           </div>
           <button
-            onClick={() => setEditingTest({ title: "", task1_prompt: "", task2_prompt: "", image_url: null })}
+            onClick={() => setEditingTest({ title: "", task1_prompt: "", task2_prompt: "", image_url: null, duration_minutes: 60 })}
             className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 sm:px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm transition-all hover:shadow-md"
           >
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Soạn đề mới</span>
@@ -174,6 +174,29 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
                 placeholder="VD: Mock Test 01 - Academic"
                 required
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-cyan-600" /> Thời gian làm bài (phút)
+              </label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="w-full sm:w-48 rounded-xl border border-slate-300 p-3 text-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all shadow-sm"
+                value={editingTest.duration_minutes ?? 60}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setEditingTest({
+                    ...editingTest,
+                    duration_minutes: raw === "" ? undefined : Math.max(1, parseInt(raw, 10) || 1),
+                  });
+                }}
+                placeholder="60"
+                required
+              />
+              <p className="text-xs text-slate-400 mt-1.5">Mặc định 60 phút. Học sinh sẽ bị tự động nộp bài khi hết thời gian.</p>
             </div>
 
             <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4 shadow-sm">
