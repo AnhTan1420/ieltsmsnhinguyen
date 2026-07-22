@@ -225,6 +225,11 @@ export default function TeacherDashboard() {
         .custom-scrollbar:hover::-webkit-scrollbar-thumb { background-color: #94a3b8; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        html { scrollbar-width: none; -ms-overflow-style: none; }
+        html::-webkit-scrollbar { display: none; }
+        @media (min-width: 1024px) {
+          html, body { height: 100%; overflow: hidden; }
+        }
       `}} />
     </main>
   );
