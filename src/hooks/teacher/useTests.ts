@@ -11,7 +11,7 @@ export function useTests(onError?: (message: string) => void) {
 
   const loadTests = async () => {
     try {
-      const { data, error: testError } = await supabase.from("tests").select("*").order("created_at", { ascending: false });
+      const { data, error: testError } = await supabase.from("tests").select("*, classes(name)").order("created_at", { ascending: false });
       if (testError) onError?.(testError.message);
       else setTests((data ?? []) as TestRow[]);
     } catch (err) {
