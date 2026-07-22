@@ -18,7 +18,7 @@ export function useSubmissions(isAuthed: boolean) {
     try {
       const { data, error: loadError } = await supabase
         .from("submissions")
-        .select("*, tests(title, task1_prompt, task2_prompt, image_url, duration_minutes)")
+        .select("*, tests(title, task1_prompt, task2_prompt, image_url, duration_minutes, class_id)")
         .order("created_at", { ascending: false });
       if (loadError) return setError(loadError.message);
       setSubmissions((data ?? []) as SubmissionRow[]);
