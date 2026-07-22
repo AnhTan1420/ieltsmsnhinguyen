@@ -15,6 +15,32 @@ export const statusLabels: Record<string, string> = {
 
 export type Correction = { original: string; corrected: string; explanation: string };
 
+/** Định dạng thời điểm nộp bài kiểu "HH:mm dd/MM/yyyy" (giờ địa phương trình duyệt) */
+export function formatDateTime(iso?: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+
+/** Tính + định dạng thời gian học sinh đã làm bài = submitted_at (hoặc mốc hiện tại nếu đang làm) - started_at */
+export function formatDuration(startedAt?: string | null, endedAt?: string | null): string {
+  if (!startedAt) return "—";
+  const start = new Date(startedAt).getTime();
+  const end = endedAt ? new Date(endedAt).getTime() : Date.now();
+  if (Number.isNaN(start) || Number.isNaN(end) || end < start) return "—";
+
+  const totalSeconds = Math.floor((end - start) / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) return `${hours}h ${minutes}p ${seconds}s`;
+  if (minutes > 0) return `${minutes} phút ${seconds}s`;
+  return `${seconds} giây`;
+}
+
 /** Đếm số từ đơn giản (tách theo khoảng trắng), dùng cho khối "Thống kê từ" */
 export function countWords(text?: string | null): number {
   if (!text) return 0;
