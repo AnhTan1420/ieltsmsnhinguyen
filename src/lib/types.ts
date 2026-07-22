@@ -5,6 +5,12 @@ export type ProfileRow = {
   created_at: string;
 };
 
+export type ClassRow = {
+  id: string;
+  name: string;
+  created_at: string;
+};
+
 export type TestRow = {
   id: string;
   title: string;
@@ -12,7 +18,10 @@ export type TestRow = {
   task2_prompt: string;
   image_url: string | null;
   duration_minutes: number;
+  class_id: string | null;
   created_at: string;
+  // Chỉ có khi query join sang bảng classes (select("*, classes(name)"))
+  classes?: { name: string } | null;
 };
 
 export type SubmissionStatus = "in_progress" | "completed" | "disqualified";
@@ -118,5 +127,6 @@ export type SubmissionRow = {
     task2_prompt: string;
     image_url: string | null;
     duration_minutes: number;
+    class_id: string | null;
   } | null;
 };
