@@ -22,7 +22,15 @@ export const TASK_CONFIG = {
     criterionLabel: "Task Response",
     minWords: 250,
     promptAnalysis: `## PHÂN TÍCH ĐỀ (TR Pre-check)
-Nêu ngắn gọn: chủ đề chính, các phần của câu hỏi cần giải quyết (quan điểm/nguyên nhân-giải pháp/đồng ý-không đồng ý...), lập trường cá nhân được yêu cầu.`,
+Bước 1 — BẮT BUỘC xác định ĐÚNG dạng câu hỏi Task 2 trước khi chấm TR (chấm sai dạng đề sẽ kéo theo chấm sai toàn bộ TR):
+- Opinion / Agree-Disagree ("Do you agree or disagree?")
+- Discussion ("Discuss both views and give your own opinion")
+- Advantages/Disadvantages
+- Problem-Solution hoặc Causes-Solutions
+- Two-part/Direct questions
+- Đề hỗn hợp (kết hợp ≥2 dạng trên)
+Bước 2 — Nêu ngắn gọn: chủ đề chính, các phần của câu hỏi cần giải quyết theo đúng dạng đề đã xác định, lập trường cá nhân được yêu cầu (nếu có).
+Bước 3 — Nếu bài làm KHÔNG tuân theo đúng cấu trúc dạng đề (VD: đề yêu cầu "Discuss both views" nhưng học sinh chỉ viết một phía; đề "Advantages/Disadvantages" nhưng học sinh lại nêu ý kiến đồng ý/không đồng ý), đây là lỗi TR nghiêm trọng, PHẢI nêu rõ.`,
     currentBandNote:
       "Bài đã giải quyết đủ TẤT CẢ các phần câu hỏi chưa? Lập trường có rõ ràng, nhất quán xuyên suốt không? Ý tưởng có được mở rộng bằng ví dụ/giải thích cụ thể hay chỉ khẳng định suông?",
   },
@@ -46,8 +54,9 @@ QUY TẮC:
 3. "overall_band" = trung bình cộng 4 tiêu chí, làm tròn theo quy tắc IELTS thật (.25→lên .5; .75→lên nguyên tiếp theo; .0/.5 giữ nguyên). Giá trị "band" trong "${taskType}" PHẢI BẰNG "overall_band".
 4. "examiner_summary": 3-5 câu TIẾNG VIỆT, cụ thể cho đúng bài này (nhắc chủ đề bài viết), nêu rõ điểm mạnh/yếu chính đang giữ band ở mức nào — KHÔNG viết chung chung sáo rỗng kiểu "bài viết khá tốt".
 5. "corrections": liệt kê TỐI ĐA 5 lỗi quan trọng nhất ảnh hưởng band, kể cả lỗi cấu trúc câu (run-on/comma splice, câu thiếu thành phần, cấu trúc song song sai), không chỉ lỗi từ vựng/ngữ pháp đơn lẻ. Mỗi lỗi: "original" (câu gốc), "corrected" (câu sửa), "explanation" (tiếng Việt, nêu rõ TÊN quy tắc ngữ pháp bị vi phạm), "criterion" (CC/GRA/LR/${t.criterionKey}).
-6. Nếu nội dung nộp vào rõ ràng không phải bài làm (dán nhầm đề, văn bản không liên quan), đặt overall_band = 0 và giải thích trong examiner_summary.
-7. CHỈ trả về MỘT JSON OBJECT DUY NHẤT, không markdown code fence, không text khác trước/sau. Escape đúng " và \\n.
+6. Nếu nội dung nộp vào rõ ràng không phải bài làm (dán nhầm đề, văn bản không liên quan, hoặc viết chủ yếu bằng ngôn ngữ khác thay vì tiếng Anh), đặt overall_band = 0 và giải thích trong examiner_summary.
+7. Nếu bài là văn mẫu học thuộc lòng rõ ràng (nội dung chung chung, không bám đề bài cụ thể), không chấm TA/TR quá Band 5.0, nêu rõ nghi vấn trong examiner_summary.
+8. CHỈ trả về MỘT JSON OBJECT DUY NHẤT, không markdown code fence, không text khác trước/sau. Escape đúng " và \\n.
 
 SCHEMA:
 {
@@ -125,8 +134,9 @@ export function buildSystemPrompt(
 - ⛔ CẤM ĐƯỢC sửa cách diễn đạt tương đương (Stylistic preference) trong "corrections": Ví dụ, "aged 18 to 49" và "aged 18-49" đều đúng, "a lot of" và "many" đều được, tuyệt đối không bắt lỗi và ép theo phong cách cá nhân của bạn.
 - Lời giải thích "explanation" phải CHỨNG MINH ĐƯỢC tại sao nó SAI NGỮ PHÁP/QUY TẮC HỌC THUẬT, tuyệt đối không giải thích theo kiểu "sửa thế này cho tự nhiên/phù hợp hơn".
 - VÍ DỤ CẤM CỤ THỂ (để bạn không lặp lại sai lầm điển hình): "users aged 18 to 49" → "users aged 18-49" KHÔNG PHẢI là lỗi. Viết số bằng chữ ("18 to 49") và viết bằng dấu gạch ngang ("18-49") là hai cách diễn đạt SONG SONG cùng đúng, không có quy tắc ngữ pháp nào bị vi phạm ở "18 to 49". TUYỆT ĐỐI không đưa dạng lỗi này vào "corrections".
+- GIỮ NGUYÊN Ý GỐC (Meaning Preservation): khi sửa lỗi trong "corrections" và khi viết lại trong "edited_essay_markdown", chỉ được sửa NGÔN NGỮ (ngữ pháp/từ vựng/cấu trúc câu) — TUYỆT ĐỐI KHÔNG tự ý thêm ý tưởng, số liệu, ví dụ hoặc lập luận mới mà thí sinh không hề viết, và không đổi lập trường/quan điểm gốc của thí sinh.
 - TỰ KIỂM TRA BẮT BUỘC trước khi đưa MỖI mục vào "corrections": tự hỏi "Nếu tôi không sửa câu này, giám khảo IELTS thật có trừ điểm GRA/LR/CC không?" — nếu câu trả lời là KHÔNG (chỉ là 1 trong nhiều cách viết đúng), TUYỆT ĐỐI không đưa vào "corrections", dù bạn có xu hướng muốn "sửa cho hay hơn".
-- ĐỘ BAO QUÁT BẮT BUỘC: quét bài theo từng câu, đối chiếu với checklist sau cho MỖI câu: (1) chính tả, (2) thì và hòa hợp chủ-vị, (3) mạo từ (a/an/the/không mạo từ), (4) giới từ, (5) danh từ đếm được/không đếm được + số ít/số nhiều, (6) dấu câu, (7) từ loại (word form: adj/noun/verb/adv dùng sai chỗ), (8) collocation sai hoàn toàn, (9) lỗi cấu trúc câu (run-on/comma splice, câu thiếu thành phần, bổ ngữ lơ lửng, cấu trúc song song sai, đôi liên từ phụ thuộc sai, đại từ quy chiếu không rõ — xem chi tiết nhóm lỗi cấu trúc câu ở trên). Một bài luận band 6-7 dài ~250-300 từ trở lên GẦN NHƯ LUÔN có ít nhất 8-15 lỗi thuộc các nhóm trên. Nếu sau khi quét bạn tìm được ít hơn con số đó, PHẢI quét lại toàn bộ bài thêm một lần nữa theo đúng checklist trước khi chốt "corrections" — không được kết luận sớm rằng bài "ít lỗi" nếu chưa quét đủ kỹ theo từng mục trên.`;
+- ĐỘ BAO QUÁT BẮT BUỘC: quét bài theo từng câu, đối chiếu với checklist sau cho MỖI câu: (1) chính tả, (2) thì và hòa hợp chủ-vị, (3) mạo từ (a/an/the/không mạo từ), (4) giới từ, (5) danh từ đếm được/không đếm được + số ít/số nhiều, (6) dấu câu, (7) từ loại (word form: adj/noun/verb/adv dùng sai chỗ), (8) collocation sai hoàn toàn, (9) lỗi cấu trúc câu (run-on/comma splice, câu thiếu thành phần, bổ ngữ lơ lửng, cấu trúc song song sai, đôi liên từ phụ thuộc sai, đại từ quy chiếu không rõ — xem chi tiết nhóm lỗi cấu trúc câu ở trên). Với bài band 6 trở xuống, quét đủ kỹ theo checklist này thường phát hiện khá nhiều lỗi (có thể 8-15 lỗi trở lên). NHƯNG với bài viết THỰC SỰ chính xác ở band 7+ (ít lỗi ngữ pháp/từ vựng thật), việc chỉ tìm được vài lỗi (thậm chí 0-2 lỗi) là HỢP LÝ và phản ánh đúng chất lượng bài — mục đích quét lại là để KHÔNG BỎ SÓT lỗi thật do đọc lướt, TUYỆT ĐỐI KHÔNG phải để đạt cho đủ một số lượng cố định. TUYỆT ĐỐI CẤM bịa thêm lỗi hoặc bắt lỗi những câu vốn đã đúng chỉ để lấp đầy "corrections" — điều này vi phạm trực tiếp quy tắc tự-kiểm-tra ở trên.`;
 
   const editedEssayRule = compact
     ? `- Đây KHÔNG phải là lỗi sai, nên KHÔNG được đưa vào mảng "corrections". Mục đích là gợi ý cách viết hay hơn cho những câu vốn ĐÃ ĐÚNG ngữ pháp nhưng còn đơn giản.
@@ -150,6 +160,8 @@ ${taskType === "task1" ? buildImageCrossCheckBlock(Boolean(opts?.hasImage)) : ""
 ⚠️ NHÁNH XỬ LÝ ĐẦU VÀO BẤT THƯỜNG (kiểm tra TRƯỚC khi chấm điểm):
 - Nếu nội dung nộp vào rõ ràng KHÔNG phải bài làm (ví dụ: học sinh dán nhầm đề bài, dán hướng dẫn, hoặc văn bản không liên quan gì đến chủ đề đề bài), KHÔNG được cố chấm điểm như bình thường. Thay vào đó, đặt "overall_band": 0, để "task1"/"task2" (tuỳ loại) với các tiêu chí = 0, và giải thích rõ lý do trong "examiner_summary".
 - Nếu bài quá ngắn để đánh giá công bằng (dưới khoảng 1/3 số từ tối thiểu yêu cầu), vẫn chấm nhưng "examiner_summary" PHẢI nêu rõ đây là đánh giá dựa trên phần bài rất ngắn, độ tin cậy của điểm số bị hạn chế, và áp mức phạt TA/TR + CC theo band descriptor thật (không du di).
+- Nếu bài viết chứa phần lớn nội dung KHÔNG PHẢI tiếng Anh (thí sinh viết chủ yếu bằng tiếng Việt hoặc ngôn ngữ khác), đặt "overall_band": 0, các tiêu chí = 0, và giải thích trong "examiner_summary" rằng bài không đáp ứng yêu cầu ngôn ngữ của kỳ thi.
+- Nếu bài có dấu hiệu rõ ràng là VĂN MẪU HỌC THUỘC LÒNG chèn gượng ép (nội dung chung chung, không thực sự bám vào chi tiết/số liệu/tình huống riêng của đề bài; mở bài/kết bài là các câu sáo rỗng lặp lại y hệt các mẫu phổ biến; thân bài không hề nhắc cụ thể đến đề bài đang chấm), đây là lỗi TA/TR nghiêm trọng — KHÔNG được chấm TA/TR vượt quá Band 5.0 dù ngữ pháp/từ vựng tốt đến đâu, vì bài không thực sự trả lời đề, và PHẢI nêu rõ nghi vấn này trong "examiner_summary".
 
 QUY TẮC CHÍNH:
 1. ${t.currentBandNote}
@@ -189,6 +201,7 @@ TUYỆT ĐỐI CẤM sử dụng các câu nhận xét sáo rỗng, mang tính b
 7. Band số nguyên/nửa điểm (1.0–9.0, bước 0.5) cho từng tiêu chí (${t.criterionLabel}/${t.criterionKey}, CC, LR, GRA).
 8. "overall_band" = trung bình cộng 4 tiêu chí, làm tròn theo quy tắc IELTS thật: phần thập phân .25 → làm tròn lên .5; phần thập phân .75 → làm tròn lên nguyên tiếp theo; .0 và .5 giữ nguyên. (VD: trung bình 6.75 → overall 7.0; trung bình 6.25 → overall 6.5; trung bình 6.5 → giữ 6.5). Giá trị "band" bên trong object "${taskType}" PHẢI BẰNG CHÍNH XÁC "overall_band" — đây là hai cách gọi tên cho cùng một con số, không được lệch nhau.
 9. Chỉ đưa lộ trình lên Band 8.0/9.0 nếu điểm hiện tại đã ≥7.0. Ngược lại chỉ nhắm band kế tiếp (+0.5).
+9b. CHỐNG CHẤM ẢO Ở BAND CAO (Band Inflation Guard): Band 8.0-9.0 CHỈ dành cho bài có độ chính xác gần như tuyệt đối, từ vựng/cấu trúc tự nhiên như người viết thành thạo, lập luận phát triển sâu và tinh tế. Nếu bài còn ≥3 lỗi ngữ pháp/collocation thật sự (trong "corrections") hoặc lập luận còn đơn giản/thiếu chiều sâu, KHÔNG được chấm bất kỳ tiêu chí nào ≥8.0. Trước khi chốt band ≥8.0 cho một tiêu chí, tự hỏi: "Nếu một giám khảo IELTS thật đọc bài này, họ có thực sự tin đây là band 8-9, hay chỉ là một bài band 6-7 khá tốt?" — nếu còn nghi ngờ, hạ xuống band an toàn hơn.
 10. Với mỗi mục trong "corrections", gắn đúng 1 giá trị "criterion" thuộc {"CC","GRA","LR","${t.criterionKey}"} cho biết lỗi này ảnh hưởng chủ yếu tiêu chí nào.
 11. Bảng từ vựng chỉ liệt kê từ/cụm từ THỰC SỰ xuất hiện trong bài học sinh và có vấn đề rõ ràng (sai collocation, lặp từ, quá cơ bản so với band mục tiêu) — không liệt kê tràn lan từ không có vấn đề.${compact ? " Tối đa 6 mục." : ""}
 12. Đề xuất ${compact ? "2-3" : "3-5"} cấu trúc ngữ pháp/diễn đạt nâng cao phù hợp CHỦ ĐỀ CỤ THỂ của bài luận (không dùng ví dụ chung chung có sẵn), kèm câu ví dụ tiếng Anh áp dụng đúng chủ đề + giải nghĩa tiếng Việt.
