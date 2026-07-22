@@ -46,6 +46,13 @@ function toHalfBand(x: number): number {
   return Math.round(Math.min(Math.max(x, 1), 9) * 2) / 2;
 }
 
+function toWholeBand(x: any): number {
+  const num = parseFloat(String(x));
+  const validNum = isNaN(num) ? 1 : num;
+  // Math.round sẽ làm tròn về số nguyên gần nhất (vd: 6.4 -> 6; 6.5 -> 7)
+  return Math.round(Math.min(Math.max(validNum, 1), 9));
+}
+
 /**
  * Sanitize AI output: Bọc thép các trường hợp AI nhầm lẫn TA/TR hoặc nhầm Object Task1/Task2
  */
@@ -64,28 +71,28 @@ function sanitizeBands(raw: GradingFeedback, taskType: TaskType): GradingFeedbac
     raw.task1 = null;
   }
 
-  // 2. CHUẨN HOÁ TASK 1 (giữ half-band 0.5, không ép về số nguyên)
+  /// 2. CHUẨN HOÁ TASK 1 (ép về số nguyên dương)
   if (raw.task1) {
     const taScore = raw.task1.TA ?? (raw.task1 as any).TR ?? 1;
-    raw.task1.TA = toHalfBand(taScore);
-    raw.task1.CC = toHalfBand(raw.task1.CC ?? 1);
-    raw.task1.LR = toHalfBand(raw.task1.LR ?? 1);
-    raw.task1.GRA = toHalfBand(raw.task1.GRA ?? 1);
+    raw.task1.TA = toWholeBand(taScore);
+    raw.task1.CC = toWholeBand(raw.task1.CC ?? 1);
+    raw.task1.LR = toWholeBand(raw.task1.LR ?? 1);
+    raw.task1.GRA = toWholeBand(raw.task1.GRA ?? 1);
 
     const mean = (raw.task1.TA + raw.task1.CC + raw.task1.LR + raw.task1.GRA) / 4;
-    raw.task1.band = toHalfBand(mean);
+    raw.task1.band = toWholeBand(mean);
   }
 
-  // 3. CHUẨN HOÁ TASK 2
+  // 3. CHUẨN HOÁ TASK 2 (ép về số nguyên dương)
   if (raw.task2) {
     const trScore = raw.task2.TR ?? (raw.task2 as any).TA ?? 1;
-    raw.task2.TR = toHalfBand(trScore);
-    raw.task2.CC = toHalfBand(raw.task2.CC ?? 1);
-    raw.task2.LR = toHalfBand(raw.task2.LR ?? 1);
-    raw.task2.GRA = toHalfBand(raw.task2.GRA ?? 1);
+    raw.task2.TR = toWholeBand(trScore);
+    raw.task2.CC = toWholeBand(raw.task2.CC ?? 1);
+    raw.task2.LR = toWholeBand(raw.task2.LR ?? 1);
+    raw.task2.GRA = toWholeBand(raw.task2.GRA ?? 1);
 
     const mean = (raw.task2.TR + raw.task2.CC + raw.task2.LR + raw.task2.GRA) / 4;
-    raw.task2.band = toHalfBand(mean);
+    raw.task2.band = toWholeBand(mean);
   }
 
   // 4. TÍNH TOÁN LẠI OVERALL BAND
