@@ -50,6 +50,11 @@ function toHalfBand(x: number): number {
  * Sanitize AI output: Bọc thép các trường hợp AI nhầm lẫn TA/TR hoặc nhầm Object Task1/Task2
  */
 function sanitizeBands(raw: GradingFeedback, taskType: TaskType): GradingFeedback {
+  // BỔ SUNG: Bọc thép word_count đảm bảo luôn là SỐ NGUYÊN DƯƠNG
+  if (raw.word_count !== undefined) {
+    raw.word_count = Math.max(0, Math.round(Number(raw.word_count) || 0));
+  }
+
   // 1. CHỐNG ẢO GIÁC: Đang chấm Task 1 nhưng AI lại nhét kết quả vào object `task2`
   if (taskType === "task1" && !raw.task1 && raw.task2) {
     raw.task1 = raw.task2 as any;
