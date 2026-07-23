@@ -70,7 +70,7 @@ export default function TaskCard({
           </label>
           <textarea
             id={`task${taskNumber}-answer`}
-            className="min-h-[320px] w-full flex-1 resize-y rounded-2xl border border-slate-300 p-4 font-serif text-[15px] leading-[1.9] text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10"
+            className="min-h-[320px] w-full flex-1 resize-y rounded-2xl border border-slate-300 p-4 font-serif text-base leading-[1.9] text-slate-800 outline-none transition focus:border-cyan-500 focus:ring-4 focus:ring-cyan-500/10 sm:text-[15px]"
             placeholder="Nhập bài làm tiếng Anh..."
             value={answer}
             onChange={(e) => onAnswerChange(e.target.value)}
