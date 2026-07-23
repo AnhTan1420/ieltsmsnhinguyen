@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getFullscreenElement, isFullscreenSupported, requestFullscreenSafe } from "@/lib/device-utils";
 
 const MAX_WARNINGS = 5;
 
@@ -23,6 +24,8 @@ export function useAntiCheat({
 }: UseAntiCheatOptions) {
   const [warnings, setWarnings] = useState(initialWarnings);
   const [isLocked, setIsLocked] = useState(false);
+  // undefined = chưa xác định (SSR/lần render đầu), tránh lệch nội dung server/client.
+  const [fullscreenSupported, setFullscreenSupported] = useState<boolean | undefined>(undefined);
   const lastViolationTimeRef = useRef(0);
   const localWarningCountRef = useRef(initialWarnings);
   const reportViolationRef = useRef<((reason: AntiCheatReason) => Promise<void>) | null>(null);
@@ -31,18 +34,26 @@ export function useAntiCheat({
   const bypassTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isTabSwitchingRef = useRef(false);
 
+  // Xác định khả năng fullscreen của thiết bị ngay khi mount (chỉ chạy ở client).
+  // Đây là phát hiện tính năng một lần (feature detection), không phụ thuộc state
+  // React nào khác nên không gây cascading renders.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFullscreenSupported(isFullscreenSupported());
+  }, []);
+
+  // enterFullscreen không bao giờ throw nữa: nếu thiết bị không hỗ trợ
+  // (ví dụ Safari iOS), trả về false và cho phép bài thi tiếp tục bình thường
+  // thay vì chặn học sinh ngay từ màn hình "Vào phòng thi".
   const enterFullscreen = useCallback(async () => {
-    if (!document.fullscreenElement) {
-      await document.documentElement.requestFullscreen();
-    }
+    const ok = await requestFullscreenSafe();
+    setFullscreenSupported(isFullscreenSupported());
+    return ok;
   }, []);
 
   const reportViolation = useCallback(
     async (reason: AntiCheatReason) => {
       if (!enabled || !submissionId || isLocked) return;
-
-      // Store the latest function in ref for event handlers
-      reportViolationRef.current = reportViolation;
 
       // Debounce: 1000ms (1 second) to prevent rapid warnings from the same action
       // Also prevent duplicate warnings for the same reason within the debounce period
@@ -91,12 +102,14 @@ export function useAntiCheat({
       }
     },
 
-    [enabled, isLocked, onDisqualified, onWarning, submissionId, warnings],
+    [enabled, isLocked, onDisqualified, onWarning, submissionId],
   );
 
   useEffect(() => {
     if (!enabled) return;
     reportViolationRef.current = reportViolation;
+
+    const supportsFullscreen = isFullscreenSupported();
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
@@ -132,15 +145,24 @@ export function useAntiCheat({
     };
 
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && document.visibilityState === "visible") {
+      // Trên thiết bị không hỗ trợ Fullscreen API (Safari iOS), fullscreenElement
+      // sẽ luôn là null - không được coi đó là hành vi gian lận.
+      if (!supportsFullscreen) return;
+      if (!getFullscreenElement() && document.visibilityState === "visible") {
         void reportViolationRef.current?.("fullscreen_exit");
       }
     };
 
-    // Bắt sự kiện TỪ SỚM (Chuột phải hoặc giữ Ctrl/Cmd)
+    // Bắt sự kiện TỪ SỚM (Chuột phải hoặc giữ Ctrl/Cmd), đồng thời tận dụng
+    // đây là một user-gesture để thử tự động vào lại fullscreen nếu bị rơi ra
+    // ngoài ý muốn (ví dụ Android tự thoát fullscreen khi xoay màn hình).
     const handleEarlyInteraction = (e: MouseEvent | KeyboardEvent) => {
       if (e instanceof MouseEvent && e.button === 2) triggerBypass(); // Click chuột phải
       if (e instanceof KeyboardEvent && (e.ctrlKey || e.metaKey)) triggerBypass(); // Bấm Ctrl hoặc Cmd
+
+      if (supportsFullscreen && !getFullscreenElement()) {
+        void requestFullscreenSafe();
+      }
     };
 
     // Ép hệ thống cho phép Copy/Paste (Stop propagation của các hàm chặn khác nếu có)
@@ -151,6 +173,9 @@ export function useAntiCheat({
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
     window.addEventListener("blur", handleBlur);
     window.addEventListener("focus", handleFocus);
 
@@ -166,6 +191,9 @@ export function useAntiCheat({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("mousedown", handleEarlyInteraction);
@@ -180,6 +208,7 @@ export function useAntiCheat({
     warnings,
     maxWarnings: MAX_WARNINGS,
     isLocked,
+    fullscreenSupported,
     enterFullscreen,
     reportViolation,
   };
