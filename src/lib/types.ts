@@ -69,12 +69,16 @@ export type VocabularySuggestion = {
   original_word: string;
   better_alternative: string;
   reason: string;
+  // Gắn ở tầng route khi merge kết quả 2 lần gọi AI (taskType === "both").
+  // Optional để tương thích dữ liệu cũ. Xem Correction.task để biết lý do.
+  task?: "task1" | "task2";
 };
 
 export type AdvancedStructure = {
   structure_name: string;
   example_sentence_en: string;
   explanation_vi: string;
+  task?: "task1" | "task2";
 };
 
 export type GradingFeedback = {
@@ -99,11 +103,22 @@ export type GradingFeedback = {
   word_count?: number;
   meets_min_word_count?: boolean;
   prompt_analysis?: string;
-  band_progression?: BandProgression;
-  edited_essay_markdown?: string;
   vocabulary_suggestions?: VocabularySuggestion[];
   advanced_structures?: AdvancedStructure[];
+
+  // Field cũ (chưa tách theo task) — chỉ còn đáng tin khi submission chỉ chấm
+  // 1 task. Với "both", ưu tiên các field "task1_..."/"task2_..." bên dưới,
+  // được route.ts điền riêng cho từng task kể từ khi vá lỗi mất dữ liệu khi gộp.
+  band_progression?: BandProgression;
+  edited_essay_markdown?: string;
   golden_rule?: string;
+
+  task1_band_progression?: BandProgression;
+  task2_band_progression?: BandProgression;
+  task1_edited_essay_markdown?: string;
+  task2_edited_essay_markdown?: string;
+  task1_golden_rule?: string;
+  task2_golden_rule?: string;
 };
 
 export type SubmissionRow = {
@@ -120,6 +135,9 @@ export type SubmissionRow = {
   started_at: string;
   submitted_at: string | null;
   created_at: string;
+  // Do trigger set_updated_at() ở enable_realtime.sql tự set mỗi lần UPDATE —
+  // dùng để hiện "cập nhật X giây trước" cạnh nhãn LIVE trên dashboard giáo viên.
+  updated_at?: string;
   teacher_comment?: string | null;
   tests?: {
     title: string;
