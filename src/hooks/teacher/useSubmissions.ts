@@ -5,6 +5,8 @@ import { supabase, getAuthHeader } from "@/lib/supabase";
 import type { SubmissionRow } from "@/lib/types";
 import { GRADING_STEPS } from "@/components/teacher/GradingProgressModal";
 
+export type RealtimeStatus = "connecting" | "connected" | "error";
+
 // Quản lý danh sách bài nộp: tải + theo dõi realtime, chấm điểm (AI), xóa, lưu nhận xét.
 export function useSubmissions(isAuthed: boolean) {
   const [submissions, setSubmissions] = useState<SubmissionRow[]>([]);
@@ -13,6 +15,10 @@ export function useSubmissions(isAuthed: boolean) {
   const [gradingStep, setGradingStep] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSavingComment, setIsSavingComment] = useState(false);
+  // Trạng thái kênh realtime (hiện ở header dashboard) + mốc lần cuối nhận
+  // được event, để giáo viên thấy dữ liệu đang thật sự "chảy" chứ không đứng yên.
+  const [realtimeStatus, setRealtimeStatus] = useState<RealtimeStatus>("connecting");
+  const [lastRealtimeEventAt, setLastRealtimeEventAt] = useState<number | null>(null);
 
   const loadSubmissions = async () => {
     try {
@@ -35,10 +41,41 @@ export function useSubmissions(isAuthed: boolean) {
     };
     void load();
 
+    // UPDATE là sự kiện tần suất cao nhất (autosave nội dung mỗi vài giây +
+    // mỗi lần tăng warning_count) — thay vì gọi lại loadSubmissions() (load
+    // full bảng + JOIN tests) như trước, ghép thẳng payload.new vào state cục
+    // bộ. payload.new luôn đầy đủ mọi cột vô hướng của bảng submissions,
+    // chỉ thiếu field "tests" (join riêng, không có trong bản ghi gốc) nên
+    // giữ nguyên tests cũ đã load. Kết quả: badge cảnh báo + nội dung bài làm
+    // hiện ngay tức khắc, không cần round-trip mạng thứ 2.
+    const handleUpdate = (newRow: SubmissionRow) => {
+      setSubmissions((prev) =>
+        prev.map((s) => (s.id === newRow.id ? ({ ...s, ...newRow, tests: s.tests } as SubmissionRow) : s)),
+      );
+      setLastRealtimeEventAt(Date.now());
+    };
+
+    // INSERT (học sinh vừa bắt đầu làm bài) và DELETE (giáo viên xóa bài) ít
+    // xảy ra hơn nhiều và cần dữ liệu join tests đầy đủ / đổi thứ tự danh
+    // sách, nên vẫn load lại toàn bộ cho đơn giản và chắc chắn đúng.
+    const handleInsertOrDelete = () => {
+      setLastRealtimeEventAt(Date.now());
+      void loadSubmissions();
+    };
+
     const channel = supabase
       .channel("teacher-submissions")
-      .on("postgres_changes", { event: "*", schema: "public", table: "submissions" }, () => void loadSubmissions())
-      .subscribe();
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "submissions" }, (payload) =>
+        handleUpdate(payload.new as SubmissionRow),
+      )
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "submissions" }, handleInsertOrDelete)
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "submissions" }, handleInsertOrDelete)
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") setRealtimeStatus("connected");
+        else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          setRealtimeStatus("error");
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
@@ -167,5 +204,7 @@ export function useSubmissions(isAuthed: boolean) {
     handleSaveComment,
     submissionsError: error,
     setSubmissionsError: setError,
+    realtimeStatus,
+    lastRealtimeEventAt,
   };
 }
