@@ -182,7 +182,9 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
             {advancedStructures.map((s, i) => (
               <div key={i} className="p-4 space-y-1">
                 <p className="text-xs font-bold uppercase tracking-wide text-cyan-700">{s.structure_name}</p>
-                <p className="text-sm text-slate-800 italic">{s.example_sentence_en}</p>
+                <p className="text-sm text-slate-800 italic">
+                  <mark className="bg-emerald-200/70 text-slate-900 rounded-sm px-0.5">{s.example_sentence_en}</mark>
+                </p>
                 <p className="text-sm text-slate-500">{s.explanation_vi}</p>
               </div>
             ))}
@@ -200,7 +202,11 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
             <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showEditedEssay ? "rotate-180" : ""}`} />
           </button>
           {showEditedEssay && (
-            <div className="p-5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{editedEssay}</div>
+            <div className="p-5">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-sky-100/70 rounded-lg px-3 py-2.5 box-decoration-clone">
+                {editedEssay}
+              </p>
+            </div>
           )}
         </div>
       )}
