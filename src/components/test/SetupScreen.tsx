@@ -1,4 +1,4 @@
-import { Maximize, ShieldAlert, Timer, User } from "lucide-react";
+import { Maximize, ShieldAlert, Smartphone, Timer, User } from "lucide-react";
 
 type Props = {
   title: string;
@@ -8,6 +8,9 @@ type Props = {
   error: string | null;
   isSubmitting: boolean;
   onSubmit: (e: React.FormEvent) => void;
+  // undefined = chưa xác định được (trước khi client mount xong), false = thiết bị
+  // không hỗ trợ Fullscreen API (điển hình: Safari trên iPhone/iPad).
+  fullscreenSupported?: boolean;
 };
 
 // MÀN HÌNH 1: NHẬP TÊN TRƯỚC KHI THI
@@ -19,7 +22,9 @@ export default function SetupScreen({
   error,
   isSubmitting,
   onSubmit,
+  fullscreenSupported,
 }: Props) {
+  const noFullscreen = fullscreenSupported === false;
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-6 text-slate-950">
       <div className="w-full max-w-md">
@@ -37,8 +42,19 @@ export default function SetupScreen({
 
           <ul className="mb-6 space-y-2.5 text-sm leading-relaxed text-slate-600">
             <li className="flex items-start gap-2.5">
-              <Maximize className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />
-              Bài thi chạy toàn màn hình (fullscreen) trong suốt thời gian làm bài.
+              {noFullscreen ? (
+                <>
+                  <Smartphone className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />
+                  Thiết bị này không hỗ trợ chế độ toàn màn hình (thường gặp trên Safari
+                  iPhone/iPad) — bài thi sẽ chạy ở chế độ bình thường, không ảnh hưởng đến
+                  việc làm bài.
+                </>
+              ) : (
+                <>
+                  <Maximize className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />
+                  Bài thi chạy toàn màn hình (fullscreen) trong suốt thời gian làm bài.
+                </>
+              )}
             </li>
             <li className="flex items-start gap-2.5">
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -79,7 +95,7 @@ export default function SetupScreen({
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3.5 font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
               <Maximize className="h-5 w-5" />
-              {isSubmitting ? "Đang tải bài thi..." : "Vào phòng thi (Bật Fullscreen)"}
+              {isSubmitting ? "Đang tải bài thi..." : noFullscreen ? "Vào phòng thi" : "Vào phòng thi (Bật Fullscreen)"}
             </button>
           </form>
         </div>
