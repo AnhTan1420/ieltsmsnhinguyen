@@ -54,19 +54,27 @@ function renderInline(text: string) {
   );
 }
 
+// Mỗi tiêu chí có 1 màu riêng — dùng xuyên suốt (icon, viền trái của thẻ, badge
+// điểm ở GradingResultPanel) để mắt quét nhanh mà không cần đọc chữ.
 function criterionIcon(label: string) {
-  if (/Task Achievement|Task Response/i.test(label)) return { Icon: Target, color: "text-cyan-600", bg: "bg-cyan-100" };
-  if (/Coherence/i.test(label)) return { Icon: Link2, color: "text-violet-600", bg: "bg-violet-100" };
-  if (/Lexical/i.test(label)) return { Icon: SpellCheck2, color: "text-amber-600", bg: "bg-amber-100" };
-  return { Icon: PenTool, color: "text-emerald-600", bg: "bg-emerald-100" };
+  if (/Task Achievement|Task Response/i.test(label))
+    return { Icon: Target, color: "text-cyan-600", bg: "bg-cyan-100", accent: "bg-cyan-400" };
+  if (/Coherence/i.test(label))
+    return { Icon: Link2, color: "text-violet-600", bg: "bg-violet-100", accent: "bg-violet-400" };
+  if (/Lexical/i.test(label))
+    return { Icon: SpellCheck2, color: "text-amber-600", bg: "bg-amber-100", accent: "bg-amber-400" };
+  return { Icon: PenTool, color: "text-emerald-600", bg: "bg-emerald-100", accent: "bg-emerald-400" };
 }
 
 function diagnosisStyle(label: string | null) {
-  if (!label) return { Icon: Lightbulb, color: "text-cyan-700", bg: "bg-cyan-50", border: "border-cyan-200" };
-  if (/Lỗi chí mạng/i.test(label)) return { Icon: AlertOctagon, color: "text-red-700", bg: "bg-red-50", border: "border-red-200" };
-  if (/dịch thuật|L1/i.test(label)) return { Icon: Languages, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200" };
-  if (/Điểm sáng/i.test(label)) return { Icon: Star, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" };
-  return { Icon: Lightbulb, color: "text-cyan-700", bg: "bg-cyan-50", border: "border-cyan-200" };
+  if (!label) return { Icon: Lightbulb, color: "text-cyan-700", bg: "bg-cyan-50", border: "border-cyan-200", iconBg: "bg-cyan-100" };
+  if (/Lỗi chí mạng/i.test(label))
+    return { Icon: AlertOctagon, color: "text-red-700", bg: "bg-red-50", border: "border-red-200", iconBg: "bg-red-100" };
+  if (/dịch thuật|L1/i.test(label))
+    return { Icon: Languages, color: "text-amber-700", bg: "bg-amber-50", border: "border-amber-200", iconBg: "bg-amber-100" };
+  if (/Điểm sáng/i.test(label))
+    return { Icon: Star, color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200", iconBg: "bg-emerald-100" };
+  return { Icon: Lightbulb, color: "text-cyan-700", bg: "bg-cyan-50", border: "border-cyan-200", iconBg: "bg-cyan-100" };
 }
 
 type ExaminerSummaryCardProps = {
@@ -83,33 +91,38 @@ export default function ExaminerSummaryCard({ summary, validBands }: ExaminerSum
   if (criteria.length === 0 && diagnosis.length === 0) {
     const sanitized = sanitizeBandMentions(summary, validBands);
     return (
-      <div className="rounded-2xl bg-white p-5 border border-cyan-100/50 shadow-sm relative">
+      <div className="rounded-2xl bg-white p-5 sm:p-6 border border-cyan-100/50 shadow-sm relative">
         <div className="absolute top-0 left-0 w-1 h-full bg-cyan-400 rounded-l-2xl" />
-        <p className="text-[15px] leading-relaxed text-slate-700 whitespace-pre-line">{renderInline(sanitized)}</p>
+        <p className="text-[15px] leading-[1.8] text-slate-700 whitespace-pre-line">{renderInline(sanitized)}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-8">
       {criteria.length > 0 && (
         <div>
-          <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">
+          <h4 className="text-[13px] font-black uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-300" />
             Phân tích 4 tiêu chí chấm điểm
           </h4>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {criteria.map((item, i) => {
-              const { Icon, color, bg } = criterionIcon(item.label);
+              const { Icon, color, bg, accent } = criterionIcon(item.label);
               const sanitizedContent = sanitizeBandMentions(item.content, validBands);
               return (
-                <div key={i} className="rounded-2xl bg-white border border-slate-200/60 shadow-sm p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className={`${bg} p-1.5 rounded-lg shrink-0`}>
-                      <Icon className={`h-3.5 w-3.5 ${color}`} />
+                <div
+                  key={i}
+                  className="relative overflow-hidden rounded-2xl bg-white border border-slate-200/60 shadow-sm p-5 transition-shadow hover:shadow-md"
+                >
+                  <span className={`absolute inset-y-0 left-0 w-1 ${accent}`} />
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className={`${bg} p-2 rounded-xl shrink-0`}>
+                      <Icon className={`h-4 w-4 ${color}`} />
                     </div>
-                    <span className="text-sm font-bold text-slate-800">{item.label}</span>
+                    <span className="text-[14px] font-bold text-slate-800">{item.label}</span>
                   </div>
-                  <p className="text-[13px] leading-relaxed text-slate-600">{renderInline(sanitizedContent)}</p>
+                  <p className="text-[13.5px] leading-[1.75] text-slate-600">{renderInline(sanitizedContent)}</p>
                 </div>
               );
             })}
@@ -119,17 +132,19 @@ export default function ExaminerSummaryCard({ summary, validBands }: ExaminerSum
 
       {diagnosis.length > 0 && (
         <div>
-          <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 mb-3">
+          <h4 className="text-[13px] font-black uppercase tracking-wider text-slate-500 mb-4 flex items-center gap-2">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-slate-300" />
             Chẩn đoán chuyên sâu
           </h4>
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {diagnosis.map((item, i) => {
-              const { Icon, color, bg, border } = diagnosisStyle(item.label);
+              const { Icon, color, bg, border, iconBg } = diagnosisStyle(item.label);
               const sanitizedContent = sanitizeBandMentions(item.content, validBands);
               return (
-                <div key={i} className={`rounded-xl ${bg} border ${border} p-3.5 flex items-start gap-2.5`}>
-                  <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${color}`} />
-                  <p className="text-[13px] leading-relaxed text-slate-700">
+                <div key={i} className={`rounded-2xl ${bg} border ${border} p-4 sm:p-5 flex items-start gap-3`}>                  <div className={`${iconBg} p-1.5 rounded-lg shrink-0 mt-0.5`}>
+                    <Icon className={`h-4 w-4 ${color}`} />
+                  </div>
+                  <p className="text-[13.5px] leading-[1.75] text-slate-700">
                     {item.label && <span className={`font-bold ${color}`}>{item.label}: </span>}
                     {renderInline(sanitizedContent)}
                   </p>

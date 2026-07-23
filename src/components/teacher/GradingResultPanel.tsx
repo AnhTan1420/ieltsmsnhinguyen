@@ -6,6 +6,16 @@ import type { AdvancedStructure, BandProgression, Correction, GradingFeedback, V
 import { countWords } from "./submission-utils";
 import ExaminerSummaryCard from "./ExaminerSummaryCard";
 
+// Cùng hệ màu với 4 thẻ tiêu chí trong ExaminerSummaryCard, để mắt nối được
+// "Task Achievement" trong phần phân tích với ô điểm "TA" bên dưới mà không
+// phải đọc lại chữ.
+const CRITERION_COLORS = [
+  { text: "text-cyan-700", accent: "bg-cyan-400" }, // TA / TR
+  { text: "text-violet-700", accent: "bg-violet-400" }, // CC
+  { text: "text-amber-700", accent: "bg-amber-400" }, // LR
+  { text: "text-emerald-700", accent: "bg-emerald-400" }, // GRA
+] as const;
+
 type GradingResultPanelProps = {
   feedback: GradingFeedback;
   task1Answer?: string;
@@ -284,7 +294,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
             )}
 
             <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+              <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-100">
                 <span className="font-bold text-slate-800">Điểm chi tiết</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-100">
@@ -294,11 +304,12 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                   { label: "Lexical Resource", short: "LR", score: feedback.task1.LR },
                   { label: "Grammar", short: "GRA", score: feedback.task1.GRA },
                 ].map((item, i) => (
-                  <div key={i} className="p-4 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400" title={item.label}>
+                  <div key={i} className="relative p-5 text-center">
+                    <span className={`absolute inset-x-0 top-0 h-0.5 ${CRITERION_COLORS[i].accent}`} />
+                    <p className={`text-[11px] font-bold uppercase tracking-wider ${CRITERION_COLORS[i].text}`} title={item.label}>
                       {item.short}
                     </p>
-                    <p className="mt-1 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
+                    <p className="mt-1.5 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
                   </div>
                 ))}
               </div>
@@ -388,7 +399,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
             )}
 
             <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
+              <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-100">
                 <span className="font-bold text-slate-800">Điểm chi tiết</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-100">
@@ -398,11 +409,12 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                   { label: "Lexical Resource", short: "LR", score: feedback.task2.LR },
                   { label: "Grammar", short: "GRA", score: feedback.task2.GRA },
                 ].map((item, i) => (
-                  <div key={i} className="p-4 text-center">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400" title={item.label}>
+                  <div key={i} className="relative p-5 text-center">
+                    <span className={`absolute inset-x-0 top-0 h-0.5 ${CRITERION_COLORS[i].accent}`} />
+                    <p className={`text-[11px] font-bold uppercase tracking-wider ${CRITERION_COLORS[i].text}`} title={item.label}>
                       {item.short}
                     </p>
-                    <p className="mt-1 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
+                    <p className="mt-1.5 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
                   </div>
                 ))}
               </div>
