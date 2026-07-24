@@ -105,29 +105,39 @@ const HIGHLIGHT_KIND_STYLE: Record<HighlightItem["kind"], string> = {
   structure: "bg-emerald-200/70 decoration-emerald-500 hover:bg-emerald-300/80",
 };
 
-// Ưu tiên khi 2 loại cùng khớp vào phần text chồng lấn nhau: lỗi sai quan
-// trọng hơn nâng cấp câu, nâng cấp câu quan trọng hơn gợi ý cấu trúc chung
-// chung — số càng nhỏ càng ưu tiên.
-const HIGHLIGHT_KIND_PRIORITY: Record<HighlightItem["kind"], number> = {
-  correction: 0,
-  upgrade: 1,
-  structure: 2,
+// Khi 1 vùng text được từ 2+ loại cùng trỏ tới (chồng lấn nhau) — vd một câu
+// vừa là gợi ý nâng cấp cấu trúc, vừa là câu viết lại hay hơn — dùng màu tím
+// riêng để báo hiệu "ở đây có nhiều phản hồi", thay vì chỉ hiện 1 loại và
+// âm thầm giấu mất (những) loại còn lại.
+const MIXED_HIGHLIGHT_STYLE = "bg-violet-200/70 decoration-violet-500 hover:bg-violet-300/80";
+
+// Thứ tự ưu tiên khi cần chọn MỘT nhãn đại diện hiển thị cho cụm (chỉ dùng để
+// đặt tooltip, không dùng để loại bỏ item nào — mọi item trong cụm đều được
+// giữ lại và hiện đủ khi bấm vào).
+const HIGHLIGHT_KIND_LABEL: Record<HighlightItem["kind"], string> = {
+  correction: "lỗi sai",
+  upgrade: "câu viết lại hay hơn",
+  structure: "gợi ý cấu trúc nâng cao",
 };
+
+export type HighlightCluster = { start: number; end: number; items: HighlightItem[] };
 
 /**
  * Tô sáng các đoạn liên quan (lỗi sai/nâng cấp câu/gợi ý cấu trúc) ngay trong
  * bài làm gốc. Với mỗi item, tìm vị trí câu gốc xuất hiện trong text (khớp
- * chính xác, fallback không phân biệt hoa/thường), bỏ qua item không tìm
- * thấy hoặc bị chồng lấn vị trí với item ưu tiên cao hơn đã xử lý trước đó.
- * Bấm vào đoạn tô sáng sẽ gọi onSelect để hiện chi tiết ở panel
- * "Chi tiết phản hồi" bên cạnh. Item đang được chọn (activeItem) đổi sang
- * màu xanh cyan để phân biệt, bất kể loại gì.
+ * chính xác, fallback không phân biệt hoa/thường). Các item có vị trí chồng
+ * lấn nhau (dù không hoàn toàn trùng khít) được GỘP thành 1 cụm (cluster) —
+ * vùng tô sáng là hợp của mọi khoảng chồng lấn, và bấm vào sẽ trả về TOÀN BỘ
+ * các item trong cụm đó cho onSelect, không bỏ sót item nào như trước.
+ * Cụm chỉ có 1 loại dùng đúng màu của loại đó; cụm có từ 2 loại trở lên dùng
+ * màu tím để báo hiệu "còn nhiều phản hồi khác ở đây". Cụm đang được chọn
+ * (so khớp theo activeClusterStart) đổi sang màu xanh cyan.
  */
 export function renderHighlightedAnswer(
   text: string,
   items: HighlightItem[],
-  activeItem: HighlightItem | null,
-  onSelect: (item: HighlightItem) => void,
+  activeClusterStart: number | null,
+  onSelect: (cluster: HighlightCluster) => void,
 ) {
   if (!text) return text;
   if (!items || items.length === 0) return text;
@@ -148,39 +158,47 @@ export function renderHighlightedAnswer(
 
   if (matches.length === 0) return text;
 
-  // Sắp xếp theo vị trí xuất hiện (rồi theo độ ưu tiên nếu trùng vị trí bắt
-  // đầu), loại bỏ các match bị chồng lấn — match đến trước (ưu tiên cao hơn
-  // nếu cùng vị trí) được giữ, các match chồng lấn phía sau bị bỏ qua.
-  matches.sort((a, b) => a.start - b.start || HIGHLIGHT_KIND_PRIORITY[a.item.kind] - HIGHLIGHT_KIND_PRIORITY[b.item.kind]);
-  const filtered: Match[] = [];
-  let lastEnd = -1;
+  // Sắp xếp theo vị trí bắt đầu rồi gộp các match có khoảng chồng lấn nhau
+  // thành từng cụm — khác với trước đây (loại bỏ match đến sau), giờ MỌI
+  // match đều được giữ lại, chỉ gộp chung vùng hiển thị khi bị chồng lấn.
+  matches.sort((a, b) => a.start - b.start);
+  const clusters: HighlightCluster[] = [];
   for (const m of matches) {
-    if (m.start >= lastEnd) {
-      filtered.push(m);
-      lastEnd = m.end;
+    const last = clusters[clusters.length - 1];
+    if (last && m.start < last.end) {
+      last.end = Math.max(last.end, m.end);
+      last.items.push(m.item);
+    } else {
+      clusters.push({ start: m.start, end: m.end, items: [m.item] });
     }
   }
 
   const nodes: any[] = [];
   let cursor = 0;
-  filtered.forEach((m, i) => {
-    if (m.start > cursor) nodes.push(text.slice(cursor, m.start));
-    const isActive =
-      activeItem !== null && activeItem.kind === m.item.kind && (activeItem.data as unknown) === (m.item.data as unknown);
+  clusters.forEach((cluster, i) => {
+    if (cluster.start > cursor) nodes.push(text.slice(cursor, cluster.start));
+    const isActive = activeClusterStart === cluster.start;
+    const kinds = new Set(cluster.items.map((it) => it.kind));
+    const style = kinds.size > 1 ? MIXED_HIGHLIGHT_STYLE : HIGHLIGHT_KIND_STYLE[cluster.items[0].kind];
+    const title =
+      cluster.items.length > 1
+        ? `${cluster.items.length} phản hồi ở đây — bấm để xem tất cả`
+        : `Bấm để xem chi tiết (${HIGHLIGHT_KIND_LABEL[cluster.items[0].kind]})`;
     nodes.push(
       <button
         key={i}
         type="button"
-        onClick={() => onSelect(m.item)}
-        title="Bấm để xem chi tiết"
+        onClick={() => onSelect(cluster)}
+        title={title}
         className={`inline whitespace-normal text-left border-0 appearance-none p-0 m-0 [font:inherit] text-inherit align-baseline rounded-sm px-0.5 cursor-pointer underline decoration-2 underline-offset-2 transition-colors ${
-          isActive ? "bg-cyan-300/80 decoration-cyan-600 ring-2 ring-cyan-500" : HIGHLIGHT_KIND_STYLE[m.item.kind]
+          isActive ? "bg-cyan-300/80 decoration-cyan-600 ring-2 ring-cyan-500" : style
         }`}
       >
-        {text.slice(m.start, m.end)}
+        {text.slice(cluster.start, cluster.end)}
+        {cluster.items.length > 1 && <sup className="ml-0.5 font-bold not-italic">{cluster.items.length}</sup>}
       </button>,
     );
-    cursor = m.end;
+    cursor = cluster.end;
   });
   if (cursor < text.length) nodes.push(text.slice(cursor));
 

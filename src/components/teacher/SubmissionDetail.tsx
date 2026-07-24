@@ -35,6 +35,7 @@ import {
   formatDuration,
   formatRelativeTime,
   type HighlightItem,
+  type HighlightCluster,
 } from "./submission-utils";
 import GradingResultPanel from "./GradingResultPanel";
 
@@ -73,25 +74,25 @@ export default function SubmissionDetail({
     task1: false,
     task2: false,
   });
-  const [activeHighlight, setActiveHighlight] = useState<HighlightItem | null>(null);
+  const [activeCluster, setActiveCluster] = useState<HighlightCluster | null>(null);
   const [showExportToast, setShowExportToast] = useState(false);
 
   // Đồng bộ nội dung nhận xét + thu gọn lại các Task mỗi khi chọn bài làm khác
   useEffect(() => {
     setTeacherCommentDraft((selectedSubmission as any)?.teacher_comment ?? "");
     setExpandedTasks({ task1: false, task2: false });
-    setActiveHighlight(null);
+    setActiveCluster(null);
   }, [selectedSubmission?.id]);
 
   // Đóng bottom-sheet "Chi tiết phản hồi" trên mobile bằng phím Esc.
   useEffect(() => {
-    if (!activeHighlight) return;
+    if (!activeCluster) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActiveHighlight(null);
+      if (e.key === "Escape") setActiveCluster(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeHighlight]);
+  }, [activeCluster]);
 
   // Tách sẵn nội dung Task 1 / Task 2 từ bài làm thô
   const parsedContent = useMemo(() => parseSubmissionContent(selectedSubmission?.content), [selectedSubmission?.content]);
@@ -142,24 +143,15 @@ export default function SubmissionDetail({
 
   const hasHighlightableFeedback = allHighlightItems.length > 0;
 
-  // Nội dung dùng chung cho cả cột "Chi tiết phản hồi" trên desktop lẫn bottom-sheet
-  // trên mobile — tránh lặp JSX 2 lần cho cùng một nội dung. Nội dung khác nhau
-  // theo loại highlight đang được chọn (lỗi sai / nâng cấp câu / gợi ý cấu trúc).
-  const activeHighlightDetail = (() => {
-    if (!activeHighlight) {
-      return (
-        <p className="text-sm text-slate-400 italic leading-relaxed">
-          Bấm vào đoạn được tô sáng trong bài làm để xem chi tiết — vàng là lỗi sai, xanh dương là câu được viết lại hay hơn, xanh lá là gợi ý cấu trúc nâng cao.
-        </p>
-      );
-    }
-
-    if (activeHighlight.kind === "correction") {
-      const c = activeHighlight.data;
+  // Render chi tiết của ĐÚNG 1 item — tách riêng để tái dùng khi 1 cụm có
+  // nhiều item chồng lấn (xem activeHighlightDetail bên dưới).
+  function renderHighlightItemDetail(item: HighlightItem) {
+    if (item.kind === "correction") {
+      const c = item.data;
       return (
         <div className="space-y-4">
           <div className="flex items-start gap-2.5">
-            <div className="bg-cyan-50 text-cyan-600 rounded-full p-1.5 shrink-0">
+            <div className="bg-amber-50 text-amber-600 rounded-full p-1.5 shrink-0">
               <Lightbulb className="h-3.5 w-3.5" />
             </div>
             <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap">"{c.original}"</p>
@@ -182,8 +174,8 @@ export default function SubmissionDetail({
       );
     }
 
-    if (activeHighlight.kind === "upgrade") {
-      const u = activeHighlight.data;
+    if (item.kind === "upgrade") {
+      const u = item.data;
       return (
         <div className="space-y-4">
           <div className="flex items-start gap-2.5">
@@ -210,7 +202,7 @@ export default function SubmissionDetail({
       );
     }
 
-    const s = activeHighlight.data;
+    const s = item.data;
     return (
       <div className="space-y-4">
         <div className="flex items-start gap-2.5">
@@ -235,6 +227,38 @@ export default function SubmissionDetail({
           <p className="text-xs font-bold text-slate-500 mb-1">Giải thích:</p>
           <p className="text-sm text-slate-600 leading-relaxed">{s.explanation_vi}</p>
         </div>
+      </div>
+    );
+  }
+
+  // Nội dung dùng chung cho cả cột "Chi tiết phản hồi" trên desktop lẫn bottom-sheet
+  // trên mobile — tránh lặp JSX 2 lần cho cùng một nội dung. Khi cụm đang chọn có
+  // nhiều item chồng lấn (vd cùng 1 câu vừa là gợi ý cấu trúc vừa là câu nâng cấp),
+  // hiện lần lượt TỪNG item — không còn tình trạng 1 item "che mất" item khác nữa.
+  const activeHighlightDetail = (() => {
+    if (!activeCluster) {
+      return (
+        <p className="text-sm text-slate-400 italic leading-relaxed">
+          Bấm vào đoạn được tô sáng trong bài làm để xem chi tiết — vàng là lỗi sai, xanh dương là câu được viết lại hay hơn, xanh lá là gợi ý cấu trúc nâng cao, tím là nơi có nhiều hơn 1 phản hồi.
+        </p>
+      );
+    }
+
+    if (activeCluster.items.length === 1) {
+      return renderHighlightItemDetail(activeCluster.items[0]);
+    }
+
+    return (
+      <div className="space-y-5">
+        <p className="text-xs font-bold text-violet-600 bg-violet-50 border border-violet-100 rounded-lg px-3 py-2">
+          Đoạn này có {activeCluster.items.length} phản hồi khác nhau:
+        </p>
+        {activeCluster.items.map((item, i) => (
+          <div key={i}>
+            {i > 0 && <div className="border-t border-slate-100 -mx-1 mb-5" />}
+            {renderHighlightItemDetail(item)}
+          </div>
+        ))}
       </div>
     );
   })();
@@ -358,6 +382,9 @@ export default function SubmissionDetail({
                     <span className="flex items-center gap-1.5 text-emerald-700">
                       <span className="inline-block h-3 w-3 rounded-sm bg-emerald-200/70 border border-emerald-400 shrink-0" /> Gợi ý cấu trúc nâng cao
                     </span>
+                    <span className="flex items-center gap-1.5 text-violet-700">
+                      <span className="inline-block h-3 w-3 rounded-sm bg-violet-200/70 border border-violet-400 shrink-0" /> Nhiều phản hồi ở đây
+                    </span>
                   </div>
                 )}
 
@@ -417,8 +444,8 @@ export default function SubmissionDetail({
                                 renderHighlightedAnswer(
                                   parsedContent.task1Answer,
                                   allHighlightItems,
-                                  activeHighlight,
-                                  setActiveHighlight,
+                                  activeCluster?.start ?? null,
+                                  setActiveCluster,
                                 )
                               ) : (
                                 <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 1...</span>
@@ -481,8 +508,8 @@ export default function SubmissionDetail({
                                 renderHighlightedAnswer(
                                   parsedContent.task2Answer,
                                   allHighlightItems,
-                                  activeHighlight,
-                                  setActiveHighlight,
+                                  activeCluster?.start ?? null,
+                                  setActiveCluster,
                                 )
                               ) : (
                                 <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 2...</span>
@@ -621,16 +648,16 @@ export default function SubmissionDetail({
           {/* Trên mobile: cửa sổ trượt lên từ dưới khi bấm vào đoạn tô sáng, thay vì
               chiếm chỗ cố định như 1 cột riêng (không đủ chỗ trên màn hình nhỏ). */}
           <div
-            className={`lg:hidden fixed inset-0 z-[90] ${activeHighlight ? "pointer-events-auto" : "pointer-events-none"}`}
-            aria-hidden={!activeHighlight}
+            className={`lg:hidden fixed inset-0 z-[90] ${activeCluster ? "pointer-events-auto" : "pointer-events-none"}`}
+            aria-hidden={!activeCluster}
           >
             <div
-              className={`absolute inset-0 bg-slate-950/50 transition-opacity duration-300 ${activeHighlight ? "opacity-100" : "opacity-0"
+              className={`absolute inset-0 bg-slate-950/50 transition-opacity duration-300 ${activeCluster ? "opacity-100" : "opacity-0"
                 }`}
-              onClick={() => setActiveHighlight(null)}
+              onClick={() => setActiveCluster(null)}
             />
             <div
-              className={`absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto custom-scrollbar rounded-t-3xl bg-white p-5 pb-8 shadow-2xl transition-transform duration-300 ${activeHighlight ? "translate-y-0" : "translate-y-full"
+              className={`absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto custom-scrollbar rounded-t-3xl bg-white p-5 pb-8 shadow-2xl transition-transform duration-300 ${activeCluster ? "translate-y-0" : "translate-y-full"
                 }`}
             >
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
@@ -640,7 +667,7 @@ export default function SubmissionDetail({
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setActiveHighlight(null)}
+                  onClick={() => setActiveCluster(null)}
                   className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                   aria-label="Đóng"
                 >
