@@ -56,7 +56,18 @@ export function buildGradingJsonSchema(taskType: TaskType) {
           required: ["original", "corrected", "explanation", "criterion"],
         },
       },
-      edited_essay_markdown: { type: "string" },
+      essay_upgrades: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            original: { type: "string" },
+            upgraded: { type: "string" },
+            note: { type: "string" },
+          },
+          required: ["original", "upgraded", "note"],
+        },
+      },
       vocabulary_suggestions: {
         type: "array",
         items: {
@@ -77,6 +88,7 @@ export function buildGradingJsonSchema(taskType: TaskType) {
             structure_name: { type: "string" },
             example_sentence_en: { type: "string" },
             explanation_vi: { type: "string" },
+            original_sentence: { type: "string" },
           },
           required: ["structure_name", "example_sentence_en", "explanation_vi"],
         },
@@ -93,7 +105,7 @@ export function buildGradingJsonSchema(taskType: TaskType) {
       "task2",
       "band_progression",
       "corrections",
-      "edited_essay_markdown",
+      "essay_upgrades",
       "vocabulary_suggestions",
       "advanced_structures",
       "golden_rule",

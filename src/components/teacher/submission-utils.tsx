@@ -1,6 +1,8 @@
 // Các hằng số + hàm hỗ trợ hiển thị dùng chung giữa SubmissionList,
 // SubmissionDetail và GradingResultPanel.
 
+import type { Correction, AdvancedStructure, EssayUpgrade } from "@/lib/types";
+
 export const statusStyles: Record<string, string> = {
   in_progress: "bg-blue-50 text-blue-700 border-blue-200",
   completed: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -13,7 +15,7 @@ export const statusLabels: Record<string, string> = {
   disqualified: "Hủy bài làm",
 };
 
-export type Correction = { original: string; corrected: string; explanation: string };
+export type { Correction, AdvancedStructure, EssayUpgrade };
 
 /** Định dạng thời điểm nộp bài kiểu "HH:mm dd/MM/yyyy" (giờ địa phương trình duyệt) */
 export function formatDateTime(iso?: string | null): string {
@@ -80,39 +82,76 @@ export function countMatchedCorrections(text: string | undefined | null, correct
   return count;
 }
 
+// Một mục có thể tô sáng trong bài làm gốc — 3 loại, mỗi loại 1 màu:
+// - "correction": lỗi sai (vàng) — dữ liệu lấy từ mảng "corrections"
+// - "upgrade": câu đã đúng được viết lại hay hơn (xanh dương) — từ "essay_upgrades"
+// - "structure": câu gợi ý áp dụng cấu trúc nâng cao (xanh lá) — từ "advanced_structures"
+// Dùng union thay vì union theo field riêng để 1 hàm render/1 state "active"
+// xử lý được cả 3 loại, tránh lặp code cho từng loại.
+export type HighlightItem =
+  | { kind: "correction"; data: Correction }
+  | { kind: "upgrade"; data: EssayUpgrade }
+  | { kind: "structure"; data: AdvancedStructure };
+
+function getHighlightOriginalText(item: HighlightItem): string | undefined {
+  if (item.kind === "correction") return item.data.original;
+  if (item.kind === "upgrade") return item.data.original;
+  return item.data.original_sentence;
+}
+
+const HIGHLIGHT_KIND_STYLE: Record<HighlightItem["kind"], string> = {
+  correction: "bg-amber-200/70 decoration-amber-500 hover:bg-amber-300/80",
+  upgrade: "bg-sky-200/70 decoration-sky-500 hover:bg-sky-300/80",
+  structure: "bg-emerald-200/70 decoration-emerald-500 hover:bg-emerald-300/80",
+};
+
+// Ưu tiên khi 2 loại cùng khớp vào phần text chồng lấn nhau: lỗi sai quan
+// trọng hơn nâng cấp câu, nâng cấp câu quan trọng hơn gợi ý cấu trúc chung
+// chung — số càng nhỏ càng ưu tiên.
+const HIGHLIGHT_KIND_PRIORITY: Record<HighlightItem["kind"], number> = {
+  correction: 0,
+  upgrade: 1,
+  structure: 2,
+};
+
 /**
- * Tô sáng các đoạn bị AI sửa ngay trong bài làm gốc. Với mỗi correction, tìm vị trí
- * "original" xuất hiện trong text (khớp chính xác, fallback không phân biệt hoa/thường),
- * bỏ qua các correction không tìm thấy hoặc bị chồng lấn vị trí với correction trước đó.
- * Bấm vào đoạn tô vàng sẽ gọi onSelect để hiện chi tiết ở panel "Chi tiết phản hồi" bên cạnh.
- * Đoạn đang được chọn (activeCorrection) sẽ đổi sang màu xanh cyan để phân biệt.
+ * Tô sáng các đoạn liên quan (lỗi sai/nâng cấp câu/gợi ý cấu trúc) ngay trong
+ * bài làm gốc. Với mỗi item, tìm vị trí câu gốc xuất hiện trong text (khớp
+ * chính xác, fallback không phân biệt hoa/thường), bỏ qua item không tìm
+ * thấy hoặc bị chồng lấn vị trí với item ưu tiên cao hơn đã xử lý trước đó.
+ * Bấm vào đoạn tô sáng sẽ gọi onSelect để hiện chi tiết ở panel
+ * "Chi tiết phản hồi" bên cạnh. Item đang được chọn (activeItem) đổi sang
+ * màu xanh cyan để phân biệt, bất kể loại gì.
  */
 export function renderHighlightedAnswer(
   text: string,
-  corrections: Correction[],
-  activeCorrection: Correction | null,
-  onSelect: (correction: Correction) => void,
+  items: HighlightItem[],
+  activeItem: HighlightItem | null,
+  onSelect: (item: HighlightItem) => void,
 ) {
   if (!text) return text;
-  if (!corrections || corrections.length === 0) return text;
+  if (!items || items.length === 0) return text;
 
-  type Match = { start: number; end: number; correction: Correction };
+  type Match = { start: number; end: number; item: HighlightItem };
   const matches: Match[] = [];
 
-  for (const correction of corrections) {
-    if (!correction?.original) continue;
-    let idx = text.indexOf(correction.original);
+  for (const item of items) {
+    const original = getHighlightOriginalText(item);
+    if (!original) continue;
+    let idx = text.indexOf(original);
     if (idx === -1) {
-      idx = text.toLowerCase().indexOf(correction.original.toLowerCase());
+      idx = text.toLowerCase().indexOf(original.toLowerCase());
     }
     if (idx === -1) continue;
-    matches.push({ start: idx, end: idx + correction.original.length, correction });
+    matches.push({ start: idx, end: idx + original.length, item });
   }
 
   if (matches.length === 0) return text;
 
-  // Sắp xếp theo vị trí xuất hiện, loại bỏ các match bị chồng lấn
-  matches.sort((a, b) => a.start - b.start);
+  // Sắp xếp theo vị trí xuất hiện (rồi theo độ ưu tiên nếu trùng vị trí bắt
+  // đầu), loại bỏ các match bị chồng lấn — match đến trước (ưu tiên cao hơn
+  // nếu cùng vị trí) được giữ, các match chồng lấn phía sau bị bỏ qua.
+  matches.sort((a, b) => a.start - b.start || HIGHLIGHT_KIND_PRIORITY[a.item.kind] - HIGHLIGHT_KIND_PRIORITY[b.item.kind]);
   const filtered: Match[] = [];
   let lastEnd = -1;
   for (const m of matches) {
@@ -126,17 +165,16 @@ export function renderHighlightedAnswer(
   let cursor = 0;
   filtered.forEach((m, i) => {
     if (m.start > cursor) nodes.push(text.slice(cursor, m.start));
-    const isActive = activeCorrection === m.correction;
+    const isActive =
+      activeItem !== null && activeItem.kind === m.item.kind && (activeItem.data as unknown) === (m.item.data as unknown);
     nodes.push(
       <button
         key={i}
         type="button"
-        onClick={() => onSelect(m.correction)}
-        title="Bấm để xem chi tiết đề xuất sửa"
+        onClick={() => onSelect(m.item)}
+        title="Bấm để xem chi tiết"
         className={`inline whitespace-normal text-left border-0 appearance-none p-0 m-0 [font:inherit] text-inherit align-baseline rounded-sm px-0.5 cursor-pointer underline decoration-2 underline-offset-2 transition-colors ${
-          isActive
-            ? "bg-cyan-300/80 decoration-cyan-600 ring-2 ring-cyan-500"
-            : "bg-amber-200/70 decoration-amber-500 hover:bg-amber-300/80"
+          isActive ? "bg-cyan-300/80 decoration-cyan-600 ring-2 ring-cyan-500" : HIGHLIGHT_KIND_STYLE[m.item.kind]
         }`}
       >
         {text.slice(m.start, m.end)}

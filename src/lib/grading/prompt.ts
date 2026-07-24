@@ -43,7 +43,7 @@ Bước 4 — Kiểm tra câu mở đầu (background statement) có thực sự
 // free/on-demand, giới hạn 6000 token/phút CHO CẢ input lẫn max_tokens
 // output cộng lại). Chỉ giữ đúng phần lõi để chấm điểm được, bỏ hết phần
 // mở rộng (band_progression, vocabulary_suggestions, advanced_structures,
-// edited_essay_markdown) — các field này đã optional trong GradingFeedback
+// essay_upgrades) — các field này đã optional trong GradingFeedback
 // nên việc thiếu chúng không làm vỡ type/UI, chỉ đơn giản là không hiển thị.
 // ─────────────────────────────────────────────────────────────
 function buildMinimalPrompt(taskType: TaskType): string {
@@ -136,16 +136,18 @@ export function buildSystemPrompt(
 - ⛔ CẤM ĐƯỢC sửa cách diễn đạt tương đương (Stylistic preference) trong "corrections": Ví dụ, "aged 18 to 49" và "aged 18-49" đều đúng, "a lot of" và "many" đều được, tuyệt đối không bắt lỗi và ép theo phong cách cá nhân của bạn.
 - Lời giải thích "explanation" phải CHỨNG MINH ĐƯỢC tại sao nó SAI NGỮ PHÁP/QUY TẮC HỌC THUẬT, tuyệt đối không giải thích theo kiểu "sửa thế này cho tự nhiên/phù hợp hơn".
 - VÍ DỤ CẤM CỤ THỂ (để bạn không lặp lại sai lầm điển hình): "users aged 18 to 49" → "users aged 18-49" KHÔNG PHẢI là lỗi. Viết số bằng chữ ("18 to 49") và viết bằng dấu gạch ngang ("18-49") là hai cách diễn đạt SONG SONG cùng đúng, không có quy tắc ngữ pháp nào bị vi phạm ở "18 to 49". TUYỆT ĐỐI không đưa dạng lỗi này vào "corrections".
-- GIỮ NGUYÊN Ý GỐC (Meaning Preservation): khi sửa lỗi trong "corrections" và khi viết lại trong "edited_essay_markdown", chỉ được sửa NGÔN NGỮ (ngữ pháp/từ vựng/cấu trúc câu) — TUYỆT ĐỐI KHÔNG tự ý thêm ý tưởng, số liệu, ví dụ hoặc lập luận mới mà thí sinh không hề viết, và không đổi lập trường/quan điểm gốc của thí sinh.
+- GIỮ NGUYÊN Ý GỐC (Meaning Preservation): khi sửa lỗi trong "corrections" và khi viết lại trong "essay_upgrades", chỉ được sửa NGÔN NGỮ (ngữ pháp/từ vựng/cấu trúc câu) — TUYỆT ĐỐI KHÔNG tự ý thêm ý tưởng, số liệu, ví dụ hoặc lập luận mới mà thí sinh không hề viết, và không đổi lập trường/quan điểm gốc của thí sinh.
 - TỰ KIỂM TRA BẮT BUỘC trước khi đưa MỖI mục vào "corrections": tự hỏi "Nếu tôi không sửa câu này, giám khảo IELTS thật có trừ điểm GRA/LR/CC không?" — nếu câu trả lời là KHÔNG (chỉ là 1 trong nhiều cách viết đúng), TUYỆT ĐỐI không đưa vào "corrections", dù bạn có xu hướng muốn "sửa cho hay hơn".
 - ĐỘ BAO QUÁT BẮT BUỘC: quét bài theo từng câu, đối chiếu với checklist sau cho MỖI câu: (1) chính tả, (2) thì và hòa hợp chủ-vị, (3) mạo từ (a/an/the/không mạo từ), (4) giới từ, (5) danh từ đếm được/không đếm được + số ít/số nhiều, (6) dấu câu, (7) từ loại (word form: adj/noun/verb/adv dùng sai chỗ), (8) collocation sai hoàn toàn, (9) lỗi cấu trúc câu (run-on/comma splice, câu thiếu thành phần, bổ ngữ lơ lửng, cấu trúc song song sai, đôi liên từ phụ thuộc sai, đại từ quy chiếu không rõ — xem chi tiết nhóm lỗi cấu trúc câu ở trên). Với bài band 6 trở xuống, quét đủ kỹ theo checklist này thường phát hiện khá nhiều lỗi (có thể 8-15 lỗi trở lên). NHƯNG với bài viết THỰC SỰ chính xác ở band 7+ (ít lỗi ngữ pháp/từ vựng thật), việc chỉ tìm được vài lỗi (thậm chí 0-2 lỗi) là HỢP LÝ và phản ánh đúng chất lượng bài — mục đích quét lại là để KHÔNG BỎ SÓT lỗi thật do đọc lướt, TUYỆT ĐỐI KHÔNG phải để đạt cho đủ một số lượng cố định. TUYỆT ĐỐI CẤM bịa thêm lỗi hoặc bắt lỗi những câu vốn đã đúng chỉ để lấp đầy "corrections" — điều này vi phạm trực tiếp quy tắc tự-kiểm-tra ở trên.`;
 
   const editedEssayRule = compact
     ? `- Đây KHÔNG phải là lỗi sai, nên KHÔNG được đưa vào mảng "corrections". Mục đích là gợi ý cách viết hay hơn cho những câu vốn ĐÃ ĐÚNG ngữ pháp nhưng còn đơn giản.
-- Do giới hạn độ dài phản hồi: "edited_essay_markdown" CHỈ cần viết lại 2-3 đoạn tiêu biểu nhất (không cần viết lại toàn bài), thể hiện rõ cách nâng cấp câu đơn giản thành câu phức/ghép.`
+- Do giới hạn độ dài phản hồi: chọn TỐI ĐA 3 câu tiêu biểu nhất trong bài để đưa vào "essay_upgrades" (không cần xử lý toàn bài).
+- Với mỗi mục trong "essay_upgrades": "original" PHẢI là nguyên văn CHÍNH XÁC TỪNG KÝ TỰ một câu có thật trong bài làm của học sinh (copy-paste, KHÔNG được diễn giải/rút gọn/sửa chính tả — nếu sửa dù 1 ký tự, hệ thống sẽ không định vị được câu này trong bài để hiển thị), "upgraded" là bản viết lại hay hơn, "note" giải thích ngắn gọn bằng tiếng Việt đã nâng cấp bằng cấu trúc gì.`
     : `- Đây KHÔNG phải là lỗi sai, nên KHÔNG được đưa vào mảng "corrections". Mục đích là gợi ý cách viết hay hơn cho những câu vốn ĐÃ ĐÚNG ngữ pháp nhưng còn đơn giản (lặp cấu trúc "S + V + O", chưa tận dụng mệnh đề quan hệ, cụm phân từ, đảo ngữ, bị động cần thiết...).
-- Thể hiện các gợi ý nâng cấp này trong "edited_essay_markdown" (bản viết lại HOÀN CHỈNH của TOÀN BỘ bài, có thể kết hợp sửa lỗi thật + nâng cấp cấu trúc) và/hoặc trong "advanced_structures" (cấu trúc mẫu áp dụng đúng chủ đề bài).
-- TUYỆT ĐỐI CẤM việc chỉ thay thế từ vựng mà giữ nguyên cấu trúc câu đơn giản trong phần nâng cấp này — phải thể hiện rõ tư duy "biến câu đơn thành câu phức/ghép" một cách học thuật.`;
+- Chọn 3-6 câu tiêu biểu nhất trong bài (không cần xử lý toàn bộ mọi câu), đưa vào mảng "essay_upgrades". Mỗi mục gồm "original" (câu gốc), "upgraded" (câu viết lại hay hơn), "note" (giải thích ngắn gọn bằng tiếng Việt đã áp dụng cấu trúc/kỹ thuật gì).
+- ⛔ YÊU CẦU BẮT BUỘC VỀ "original": PHẢI là nguyên văn CHÍNH XÁC TỪNG KÝ TỰ một câu có thật, lấy đúng từ bài làm của học sinh (copy-paste, không diễn giải lại, không sửa chính tả/dấu câu dù chỉ 1 ký tự) — vì hệ thống dùng đúng chuỗi này để tìm và tô sáng câu đó trong bài làm gốc cho học sinh xem. Nếu "original" không khớp chính xác với một câu thật trong bài, tính năng highlight sẽ không hoạt động và mục đó vô giá trị.
+- TUYỆT ĐỐI CẤM việc chỉ thay thế từ vựng mà giữ nguyên cấu trúc câu đơn giản trong "upgraded" — phải thể hiện rõ tư duy "biến câu đơn thành câu phức/ghép" một cách học thuật.`;
 
   return `Bạn là giám khảo IELTS Writing với 15+ năm kinh nghiệm chấm thi (Cambridge Assessment English). Chấm ${t.label} theo band descriptor chính thức (British Council/IDP, bản 2023). Tập trung vào ${t.primaryFocus}.
 
@@ -215,9 +217,9 @@ TUYỆT ĐỐI CẤM sử dụng các câu nhận xét sáo rỗng, mang tính b
 9b. CHỐNG CHẤM ẢO Ở BAND CAO (Band Inflation Guard): Band 8.0-9.0 CHỈ dành cho bài có độ chính xác gần như tuyệt đối, từ vựng/cấu trúc tự nhiên như người viết thành thạo, lập luận phát triển sâu và tinh tế. Nếu bài còn ≥3 lỗi ngữ pháp/collocation thật sự (trong "corrections") hoặc lập luận còn đơn giản/thiếu chiều sâu, KHÔNG được chấm bất kỳ tiêu chí nào ≥8.0. Trước khi chốt band ≥8.0 cho một tiêu chí, tự hỏi: "Nếu một giám khảo IELTS thật đọc bài này, họ có thực sự tin đây là band 8-9, hay chỉ là một bài band 6-7 khá tốt?" — nếu còn nghi ngờ, hạ xuống band an toàn hơn.
 10. Với mỗi mục trong "corrections", gắn đúng 1 giá trị "criterion" thuộc {"CC","GRA","LR","${t.criterionKey}"} cho biết lỗi này ảnh hưởng chủ yếu tiêu chí nào.
 11. Bảng từ vựng chỉ liệt kê từ/cụm từ THỰC SỰ xuất hiện trong bài học sinh và có vấn đề rõ ràng (sai collocation, lặp từ, quá cơ bản so với band mục tiêu) — không liệt kê tràn lan từ không có vấn đề.${compact ? " Tối đa 6 mục." : ""}
-12. Đề xuất ${compact ? "2-3" : "3-5"} cấu trúc ngữ pháp/diễn đạt nâng cao phù hợp CHỦ ĐỀ CỤ THỂ của bài luận (không dùng ví dụ chung chung có sẵn), kèm câu ví dụ tiếng Anh áp dụng đúng chủ đề + giải nghĩa tiếng Việt.
+12. Đề xuất ${compact ? "2-3" : "3-5"} cấu trúc ngữ pháp/diễn đạt nâng cao phù hợp CHỦ ĐỀ CỤ THỂ của bài luận (không dùng ví dụ chung chung có sẵn), kèm câu ví dụ tiếng Anh áp dụng đúng chủ đề + giải nghĩa tiếng Việt. Với mỗi mục, nếu cấu trúc này dùng để nâng cấp một câu CỤ THỂ đã có sẵn trong bài làm, điền "original_sentence" bằng nguyên văn CHÍNH XÁC TỪNG KÝ TỰ câu đó (copy-paste, không sửa/diễn giải — dùng để tô sáng đúng vị trí trong bài làm cho học sinh xem); nếu gợi ý mang tính tổng quát không gắn với câu cụ thể nào, để "original_sentence" là chuỗi rỗng "".
 13. "golden_rule": MỘT câu NGẮN GỌN, cụ thể, cá nhân hoá cho đúng bài này — nguyên tắc/thói quen sửa mà nếu thí sinh áp dụng ngay sẽ cải thiện band nhanh nhất (không viết chung chung kiểu "học thêm từ vựng").
-14. TOÀN BỘ phản hồi của bạn CHỈ LÀ MỘT JSON OBJECT DUY NHẤT, không có bất kỳ text nào trước hoặc sau, không dùng markdown code fence (không có \`\`\`json). Các trường dạng markdown bên trong JSON (edited_essay_markdown, vocabulary/table nếu có) được phép chứa cú pháp markdown như một CHUỖI, nhưng bản thân response tổng thể phải là JSON hợp lệ, parse được ngay bằng JSON.parse(). CHỈ trả về đúng các trường có trong SCHEMA bên dưới, không thêm bất kỳ trường nào khác.
+14. TOÀN BỘ phản hồi của bạn CHỈ LÀ MỘT JSON OBJECT DUY NHẤT, không có bất kỳ text nào trước hoặc sau, không dùng markdown code fence (không có \`\`\`json). CHỈ trả về đúng các trường có trong SCHEMA bên dưới, không thêm bất kỳ trường nào khác.
 15. Escape đúng mọi dấu " và ký tự xuống dòng bên trong các giá trị string (dùng \\n hợp lệ trong JSON, không dùng xuống dòng thật chưa escape).
 
 SCHEMA CHÍNH XÁC (điền đầy đủ mọi trường, không bỏ trống trừ khi có ghi chú null được phép):
@@ -245,12 +247,14 @@ SCHEMA CHÍNH XÁC (điền đầy đủ mọi trường, không bỏ trống tr
       "criterion": "CC" | "GRA" | "LR" | "${t.criterionKey}"
     }
   ],
-  "edited_essay_markdown": string,
+  "essay_upgrades": [
+    { "original": string, "upgraded": string, "note": string }
+  ],
   "vocabulary_suggestions": [
     { "original_word": string, "better_alternative": string, "reason": string }
   ],
   "advanced_structures": [
-    { "structure_name": string, "example_sentence_en": string, "explanation_vi": string }
+    { "structure_name": string, "example_sentence_en": string, "explanation_vi": string, "original_sentence": string }
   ],
   "golden_rule": string
 }`;

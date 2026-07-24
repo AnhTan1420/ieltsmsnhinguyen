@@ -18,13 +18,24 @@ import {
   Loader2,
   Radio,
   ShieldAlert,
+  Sparkles,
   Trash2,
+  Wand2,
   X,
 } from "lucide-react";
 import type { SubmissionRow } from "@/lib/types";
 import { parseSubmissionContent } from "@/lib/grading/parse";
 import { downloadSubmissionDoc, downloadSubmissionRawText } from "@/lib/teacher/exportDoc";
-import { statusLabels, statusStyles, renderHighlightedAnswer, formatDateTime, formatDuration, type Correction } from "./submission-utils";
+import { useNow } from "@/hooks/useNow";
+import {
+  statusLabels,
+  statusStyles,
+  renderHighlightedAnswer,
+  formatDateTime,
+  formatDuration,
+  formatRelativeTime,
+  type HighlightItem,
+} from "./submission-utils";
 import GradingResultPanel from "./GradingResultPanel";
 
 type SubmissionDetailProps = {
@@ -54,33 +65,51 @@ export default function SubmissionDetail({
   showOnMobile,
   onBack,
 }: SubmissionDetailProps) {
+  // Tick mỗi giây để nhãn "cập nhật X giây trước" tự nhảy số dù không có
+  // event realtime mới nào — chỉ ảnh hưởng UI, không gọi mạng.
+  const now = useNow();
   const [teacherCommentDraft, setTeacherCommentDraft] = useState("");
   const [expandedTasks, setExpandedTasks] = useState<{ task1: boolean; task2: boolean }>({
     task1: false,
     task2: false,
   });
-  const [activeCorrection, setActiveCorrection] = useState<Correction | null>(null);
+  const [activeHighlight, setActiveHighlight] = useState<HighlightItem | null>(null);
   const [showExportToast, setShowExportToast] = useState(false);
 
   // Đồng bộ nội dung nhận xét + thu gọn lại các Task mỗi khi chọn bài làm khác
   useEffect(() => {
     setTeacherCommentDraft((selectedSubmission as any)?.teacher_comment ?? "");
     setExpandedTasks({ task1: false, task2: false });
-    setActiveCorrection(null);
+    setActiveHighlight(null);
   }, [selectedSubmission?.id]);
 
   // Đóng bottom-sheet "Chi tiết phản hồi" trên mobile bằng phím Esc.
   useEffect(() => {
-    if (!activeCorrection) return;
+    if (!activeHighlight) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActiveCorrection(null);
+      if (e.key === "Escape") setActiveHighlight(null);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeCorrection]);
+  }, [activeHighlight]);
 
   // Tách sẵn nội dung Task 1 / Task 2 từ bài làm thô
   const parsedContent = useMemo(() => parseSubmissionContent(selectedSubmission?.content), [selectedSubmission?.content]);
+
+  // Gộp cả 3 loại phản hồi có thể highlight trong bài làm gốc (lỗi sai, nâng
+  // cấp câu, gợi ý cấu trúc) thành 1 danh sách dùng chung cho CẢ Task 1 lẫn
+  // Task 2 — giống cách "corrections" trước đây vẫn dùng chung 1 mảng cho cả
+  // 2 task: renderHighlightedAnswer tự khớp text nên phần không thuộc đúng
+  // task đang hiển thị sẽ tự động không tìm thấy vị trí và bị bỏ qua.
+  const allHighlightItems: HighlightItem[] = useMemo(() => {
+    const feedback = selectedSubmission?.feedback;
+    if (!feedback) return [];
+    return [
+      ...(feedback.corrections ?? []).map((data) => ({ kind: "correction" as const, data })),
+      ...(feedback.essay_upgrades ?? []).map((data) => ({ kind: "upgrade" as const, data })),
+      ...(feedback.advanced_structures ?? []).map((data) => ({ kind: "structure" as const, data })),
+    ];
+  }, [selectedSubmission?.feedback]);
 
   const handleExportRawText = async () => {
     if (!selectedSubmission) return;
@@ -111,42 +140,104 @@ export default function SubmissionDetail({
     );
   };
 
-  const hasCorrections = (selectedSubmission?.feedback?.corrections?.length ?? 0) > 0;
+  const hasHighlightableFeedback = allHighlightItems.length > 0;
 
   // Nội dung dùng chung cho cả cột "Chi tiết phản hồi" trên desktop lẫn bottom-sheet
-  // trên mobile — tránh lặp JSX 2 lần cho cùng một nội dung.
-  const correctionDetail = activeCorrection ? (
-    <div className="space-y-4">
-      <div className="flex items-start gap-2.5">
-        <div className="bg-cyan-50 text-cyan-600 rounded-full p-1.5 shrink-0">
-          <Lightbulb className="h-3.5 w-3.5" />
-        </div>
-        <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap">
-          "{activeCorrection.original}"
+  // trên mobile — tránh lặp JSX 2 lần cho cùng một nội dung. Nội dung khác nhau
+  // theo loại highlight đang được chọn (lỗi sai / nâng cấp câu / gợi ý cấu trúc).
+  const activeHighlightDetail = (() => {
+    if (!activeHighlight) {
+      return (
+        <p className="text-sm text-slate-400 italic leading-relaxed">
+          Bấm vào đoạn được tô sáng trong bài làm để xem chi tiết — vàng là lỗi sai, xanh dương là câu được viết lại hay hơn, xanh lá là gợi ý cấu trúc nâng cao.
         </p>
-      </div>
+      );
+    }
 
-      <div>
-        <p className="text-xs font-bold text-slate-500 mb-1">Giải thích:</p>
-        <p className="text-sm text-slate-600 leading-relaxed">{activeCorrection.explanation}</p>
-      </div>
+    if (activeHighlight.kind === "correction") {
+      const c = activeHighlight.data;
+      return (
+        <div className="space-y-4">
+          <div className="flex items-start gap-2.5">
+            <div className="bg-cyan-50 text-cyan-600 rounded-full p-1.5 shrink-0">
+              <Lightbulb className="h-3.5 w-3.5" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800 leading-relaxed whitespace-pre-wrap">"{c.original}"</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-1">Giải thích:</p>
+            <p className="text-sm text-slate-600 leading-relaxed">{c.explanation}</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-2">Gợi ý:</p>
+            <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-700 leading-relaxed line-through decoration-red-300/60 whitespace-pre-wrap">
+              {c.original}
+            </div>
+            <div className="flex justify-center py-1 text-slate-300">↓</div>
+            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed whitespace-pre-wrap">
+              {c.corrected}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
-      <div>
-        <p className="text-xs font-bold text-slate-500 mb-2">Gợi ý:</p>
-        <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-700 leading-relaxed line-through decoration-red-300/60 whitespace-pre-wrap">
-          {activeCorrection.original}
+    if (activeHighlight.kind === "upgrade") {
+      const u = activeHighlight.data;
+      return (
+        <div className="space-y-4">
+          <div className="flex items-start gap-2.5">
+            <div className="bg-sky-50 text-sky-600 rounded-full p-1.5 shrink-0">
+              <Sparkles className="h-3.5 w-3.5" />
+            </div>
+            <p className="text-sm font-semibold text-slate-800 leading-relaxed">Câu này đã đúng — có thể viết hay hơn</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-1">Ghi chú:</p>
+            <p className="text-sm text-slate-600 leading-relaxed">{u.note}</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-2">Nâng cấp:</p>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+              {u.original}
+            </div>
+            <div className="flex justify-center py-1 text-slate-300">↓</div>
+            <div className="rounded-xl bg-sky-50 border border-sky-100 p-3 text-sm text-sky-800 font-medium leading-relaxed whitespace-pre-wrap">
+              {u.upgraded}
+            </div>
+          </div>
         </div>
-        <div className="flex justify-center py-1 text-slate-300">↓</div>
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed whitespace-pre-wrap">
-          {activeCorrection.corrected}
+      );
+    }
+
+    const s = activeHighlight.data;
+    return (
+      <div className="space-y-4">
+        <div className="flex items-start gap-2.5">
+          <div className="bg-emerald-50 text-emerald-600 rounded-full p-1.5 shrink-0">
+            <Wand2 className="h-3.5 w-3.5" />
+          </div>
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 leading-relaxed">{s.structure_name}</p>
+        </div>
+        {s.original_sentence && (
+          <div>
+            <p className="text-xs font-bold text-slate-500 mb-2">Câu gốc → Áp dụng cấu trúc:</p>
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+              {s.original_sentence}
+            </div>
+            <div className="flex justify-center py-1 text-slate-300">↓</div>
+          </div>
+        )}
+        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed italic whitespace-pre-wrap">
+          {s.example_sentence_en}
+        </div>
+        <div>
+          <p className="text-xs font-bold text-slate-500 mb-1">Giải thích:</p>
+          <p className="text-sm text-slate-600 leading-relaxed">{s.explanation_vi}</p>
         </div>
       </div>
-    </div>
-  ) : (
-    <p className="text-sm text-slate-400 italic leading-relaxed">
-      Bấm vào đoạn được tô vàng trong bài làm để xem chi tiết đề xuất sửa từ AI.
-    </p>
-  );
+    );
+  })();
 
   return (
     <>
@@ -174,11 +265,11 @@ export default function SubmissionDetail({
         ) : (
           <div className="flex flex-col min-h-0 flex-1">
             {/* Submission Header */}
-            <div className="p-5 sm:p-7 border-b border-slate-100 bg-white shrink-0">
-              <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+            <div className="p-5 sm:p-6 border-b border-slate-100 bg-white shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">{selectedSubmission.student_name}</h2>
-                  <p className="text-sm font-medium text-cyan-700 mt-1.5">{selectedSubmission.tests?.title}</p>
+                  <p className="text-sm font-medium text-cyan-700 mt-1">{selectedSubmission.tests?.title}</p>
                 </div>
                 <span className={`text-xs font-bold px-3 py-1.5 rounded-full border ${statusStyles[selectedSubmission.status] || "bg-slate-50 border-slate-200 text-slate-600"}`}>
                   {statusLabels[selectedSubmission.status] || selectedSubmission.status}
@@ -186,7 +277,7 @@ export default function SubmissionDetail({
               </div>
 
               {/* Thời gian nộp bài + thời gian đã làm bài */}
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-5 text-xs font-semibold text-slate-500">
+              <div className="flex flex-wrap items-center gap-4 mb-4 text-xs font-semibold text-slate-500">
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-slate-400" />
                   Nộp bài:{" "}
@@ -213,7 +304,7 @@ export default function SubmissionDetail({
             </div>
 
             {/* Submission Body */}
-            <div className="p-4 sm:p-7 space-y-10 bg-slate-50/30 overflow-y-auto custom-scrollbar flex-1 min-h-0">
+            <div className="p-4 sm:p-6 space-y-8 bg-slate-50/30 overflow-y-auto custom-scrollbar flex-1 min-h-0">
               <div>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200/80 pb-3">
                   {/* Cấu trúc Flexbox: Tiêu đề + Nút Export nằm cạnh nhau */}
@@ -246,15 +337,27 @@ export default function SubmissionDetail({
                   {selectedSubmission.status === "in_progress" && (
                     <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
                       <Radio className="h-3.5 w-3.5 animate-pulse" /> Đang Live...
+                      {selectedSubmission.updated_at && (
+                        <span className="font-medium text-blue-400">
+                          · cập nhật {formatRelativeTime(selectedSubmission.updated_at, now)}
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>
 
                 {/* Gợi ý cách xem lỗi tô sáng — chỉ hiện khi đã có kết quả chấm */}
-                {hasCorrections && (
-                  <div className="flex items-center gap-2 mb-3 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 w-fit">
-                    <span className="inline-block h-3 w-3 rounded-sm bg-amber-200/70 border border-amber-400 shrink-0" />
-                    Bấm vào phần được tô vàng để xem chi tiết đề xuất sửa
+                {hasHighlightableFeedback && (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-3 text-xs font-semibold bg-slate-50 border border-slate-100 rounded-lg px-3 py-2 w-fit">
+                    <span className="flex items-center gap-1.5 text-amber-700">
+                      <span className="inline-block h-3 w-3 rounded-sm bg-amber-200/70 border border-amber-400 shrink-0" /> Lỗi sai
+                    </span>
+                    <span className="flex items-center gap-1.5 text-sky-700">
+                      <span className="inline-block h-3 w-3 rounded-sm bg-sky-200/70 border border-sky-400 shrink-0" /> Câu nên viết hay hơn
+                    </span>
+                    <span className="flex items-center gap-1.5 text-emerald-700">
+                      <span className="inline-block h-3 w-3 rounded-sm bg-emerald-200/70 border border-emerald-400 shrink-0" /> Gợi ý cấu trúc nâng cao
+                    </span>
                   </div>
                 )}
 
@@ -313,9 +416,9 @@ export default function SubmissionDetail({
                               {parsedContent.task1Answer ? (
                                 renderHighlightedAnswer(
                                   parsedContent.task1Answer,
-                                  selectedSubmission.feedback?.corrections ?? [],
-                                  activeCorrection,
-                                  setActiveCorrection,
+                                  allHighlightItems,
+                                  activeHighlight,
+                                  setActiveHighlight,
                                 )
                               ) : (
                                 <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 1...</span>
@@ -377,9 +480,9 @@ export default function SubmissionDetail({
                               {parsedContent.task2Answer ? (
                                 renderHighlightedAnswer(
                                   parsedContent.task2Answer,
-                                  selectedSubmission.feedback?.corrections ?? [],
-                                  activeCorrection,
-                                  setActiveCorrection,
+                                  allHighlightItems,
+                                  activeHighlight,
+                                  setActiveHighlight,
                                 )
                               ) : (
                                 <span className="text-slate-400 italic font-sans text-sm">Học sinh chưa làm Task 2...</span>
@@ -505,29 +608,29 @@ export default function SubmissionDetail({
         )}
     </div >
 
-      { hasCorrections && (
+      { hasHighlightableFeedback && (
         <>
           {/* Panel "Chi tiết phản hồi" trên desktop — cột thứ 3 cố định, cuộn riêng */}
           <div className="hidden lg:flex lg:flex-col rounded-3xl bg-white p-5 shadow-sm border border-slate-200/60 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] overflow-y-auto custom-scrollbar">
             <h3 className="text-sm font-black text-slate-900 flex items-center gap-2 pb-3 border-b border-slate-100 shrink-0">
               <Lightbulb className="h-4 w-4 text-amber-500" /> Chi tiết phản hồi
             </h3>
-            <div className="mt-4">{correctionDetail}</div>
+            <div className="mt-4">{activeHighlightDetail}</div>
           </div>
 
-          {/* Trên mobile: cửa sổ trượt lên từ dưới khi bấm vào đoạn tô vàng, thay vì
+          {/* Trên mobile: cửa sổ trượt lên từ dưới khi bấm vào đoạn tô sáng, thay vì
               chiếm chỗ cố định như 1 cột riêng (không đủ chỗ trên màn hình nhỏ). */}
           <div
-            className={`lg:hidden fixed inset-0 z-[90] ${activeCorrection ? "pointer-events-auto" : "pointer-events-none"}`}
-            aria-hidden={!activeCorrection}
+            className={`lg:hidden fixed inset-0 z-[90] ${activeHighlight ? "pointer-events-auto" : "pointer-events-none"}`}
+            aria-hidden={!activeHighlight}
           >
             <div
-              className={`absolute inset-0 bg-slate-950/50 transition-opacity duration-300 ${activeCorrection ? "opacity-100" : "opacity-0"
+              className={`absolute inset-0 bg-slate-950/50 transition-opacity duration-300 ${activeHighlight ? "opacity-100" : "opacity-0"
                 }`}
-              onClick={() => setActiveCorrection(null)}
+              onClick={() => setActiveHighlight(null)}
             />
             <div
-              className={`absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto custom-scrollbar rounded-t-3xl bg-white p-5 pb-8 shadow-2xl transition-transform duration-300 ${activeCorrection ? "translate-y-0" : "translate-y-full"
+              className={`absolute inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto custom-scrollbar rounded-t-3xl bg-white p-5 pb-8 shadow-2xl transition-transform duration-300 ${activeHighlight ? "translate-y-0" : "translate-y-full"
                 }`}
             >
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-200" />
@@ -537,14 +640,14 @@ export default function SubmissionDetail({
                 </h3>
                 <button
                   type="button"
-                  onClick={() => setActiveCorrection(null)}
+                  onClick={() => setActiveHighlight(null)}
                   className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                   aria-label="Đóng"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="mt-4">{correctionDetail}</div>
+              <div className="mt-4">{activeHighlightDetail}</div>
             </div>
           </div>
         </>

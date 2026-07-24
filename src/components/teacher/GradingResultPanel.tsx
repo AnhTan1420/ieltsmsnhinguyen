@@ -2,19 +2,9 @@
 
 import { useState } from "react";
 import { AlertTriangle, BookOpen, Bot, ChevronDown, Compass, Image as ImageIcon, Languages, Lightbulb, Sparkles, Type, Wand2 } from "lucide-react";
-import type { AdvancedStructure, BandProgression, Correction, GradingFeedback, VocabularySuggestion } from "@/lib/types";
+import type { AdvancedStructure, BandProgression, Correction, EssayUpgrade, GradingFeedback, VocabularySuggestion } from "@/lib/types";
 import { countWords } from "./submission-utils";
 import ExaminerSummaryCard from "./ExaminerSummaryCard";
-
-// Cùng hệ màu với 4 thẻ tiêu chí trong ExaminerSummaryCard, để mắt nối được
-// "Task Achievement" trong phần phân tích với ô điểm "TA" bên dưới mà không
-// phải đọc lại chữ.
-const CRITERION_COLORS = [
-  { text: "text-cyan-700", accent: "bg-cyan-400" }, // TA / TR
-  { text: "text-violet-700", accent: "bg-violet-400" }, // CC
-  { text: "text-amber-700", accent: "bg-amber-400" }, // LR
-  { text: "text-emerald-700", accent: "bg-emerald-400" }, // GRA
-] as const;
 
 type GradingResultPanelProps = {
   feedback: GradingFeedback;
@@ -85,6 +75,13 @@ export function resolveTaskEditedEssay(feedback: GradingFeedback, task: "task1" 
   return feedback.edited_essay_markdown && soloTaskOf(feedback) === task ? feedback.edited_essay_markdown : undefined;
 }
 
+export function resolveTaskEssayUpgrades(feedback: GradingFeedback, task: "task1" | "task2"): EssayUpgrade[] {
+  const all = feedback.essay_upgrades ?? [];
+  const hasTags = all.some((u) => u.task);
+  if (hasTags) return all.filter((u) => u.task === task);
+  return soloTaskOf(feedback) === task ? all : [];
+}
+
 export function resolveTaskVocabulary(feedback: GradingFeedback, task: "task1" | "task2"): VocabularySuggestion[] {
   const all = feedback.vocabulary_suggestions ?? [];
   const hasTags = all.some((v) => v.task);
@@ -113,17 +110,21 @@ type TaskExtrasProps = {
   bandProgression?: BandProgression;
   vocabulary: VocabularySuggestion[];
   advancedStructures: AdvancedStructure[];
-  editedEssay?: string;
+  essayUpgrades: EssayUpgrade[];
+  // Dữ liệu cũ (đoạn văn tự do, không định vị/highlight được trong bài gốc) —
+  // chỉ dùng làm fallback hiển thị cho submission chấm TRƯỚC khi có "essayUpgrades".
+  legacyEditedEssay?: string;
 };
 
-// Gom 4 mảnh phản hồi vốn đang bị AI sinh ra rồi bỏ xó (golden rule, lộ trình
-// lên band, bảng nâng cấp từ vựng, cấu trúc nâng cao, bài viết mẫu đã sửa) —
-// hiển thị riêng cho 1 task. Không render section nào nếu dữ liệu rỗng, để
-// không vỡ layout với các submission cũ chưa có mấy field này.
-function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructures, editedEssay }: TaskExtrasProps) {
-  const [showEditedEssay, setShowEditedEssay] = useState(false);
+// Gom 5 mảnh phản hồi vốn đang bị AI sinh ra rồi bỏ xó (golden rule, lộ trình
+// lên band, bảng nâng cấp từ vựng, cấu trúc nâng cao, câu được viết lại hay
+// hơn) — hiển thị riêng cho 1 task. Không render section nào nếu dữ liệu
+// rỗng, để không vỡ layout với các submission cũ chưa có mấy field này.
+function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructures, essayUpgrades, legacyEditedEssay }: TaskExtrasProps) {
+  const [showLegacyEssay, setShowLegacyEssay] = useState(false);
 
-  const hasAnything = goldenRule || bandProgression || vocabulary.length > 0 || advancedStructures.length > 0 || editedEssay;
+  const hasAnything =
+    goldenRule || bandProgression || vocabulary.length > 0 || advancedStructures.length > 0 || essayUpgrades.length > 0 || legacyEditedEssay;
   if (!hasAnything) return null;
 
   return (
@@ -192,6 +193,9 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
             {advancedStructures.map((s, i) => (
               <div key={i} className="p-4 space-y-1">
                 <p className="text-xs font-bold uppercase tracking-wide text-cyan-700">{s.structure_name}</p>
+                {s.original_sentence && (
+                  <p className="text-sm text-slate-400 line-through decoration-slate-300">{s.original_sentence}</p>
+                )}
                 <p className="text-sm text-slate-800 italic">
                   <mark className="bg-emerald-200/70 text-slate-900 rounded-sm px-0.5">{s.example_sentence_en}</mark>
                 </p>
@@ -202,19 +206,39 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
         </div>
       )}
 
-      {editedEssay && (
+      {essayUpgrades.length > 0 && (
+        <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-cyan-600" />
+            <span className="font-bold text-slate-800">Câu được viết lại hay hơn</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {essayUpgrades.map((u, i) => (
+              <div key={i} className="p-4 space-y-1.5">
+                <p className="text-sm text-slate-500 line-through decoration-slate-300">{u.original}</p>
+                <p className="text-sm text-slate-800">
+                  <mark className="bg-sky-200/70 text-slate-900 rounded-sm px-0.5">{u.upgraded}</mark>
+                </p>
+                <p className="text-sm text-slate-500">{u.note}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {essayUpgrades.length === 0 && legacyEditedEssay && (
         <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
           <button
-            onClick={() => setShowEditedEssay((v) => !v)}
+            onClick={() => setShowLegacyEssay((v) => !v)}
             className="w-full bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between gap-2 text-left"
           >
             <span className="font-bold text-slate-800">Bài viết mẫu đã chỉnh sửa</span>
-            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showEditedEssay ? "rotate-180" : ""}`} />
+            <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${showLegacyEssay ? "rotate-180" : ""}`} />
           </button>
-          {showEditedEssay && (
+          {showLegacyEssay && (
             <div className="p-5">
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-sky-100/70 rounded-lg px-3 py-2.5 box-decoration-clone">
-                {editedEssay}
+                {legacyEditedEssay}
               </p>
             </div>
           )}
@@ -294,7 +318,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
             )}
 
             <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-100">
+              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
                 <span className="font-bold text-slate-800">Điểm chi tiết</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-100">
@@ -304,12 +328,11 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                   { label: "Lexical Resource", short: "LR", score: feedback.task1.LR },
                   { label: "Grammar", short: "GRA", score: feedback.task1.GRA },
                 ].map((item, i) => (
-                  <div key={i} className="relative p-5 text-center">
-                    <span className={`absolute inset-x-0 top-0 h-0.5 ${CRITERION_COLORS[i].accent}`} />
-                    <p className={`text-[11px] font-bold uppercase tracking-wider ${CRITERION_COLORS[i].text}`} title={item.label}>
+                  <div key={i} className="p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400" title={item.label}>
                       {item.short}
                     </p>
-                    <p className="mt-1.5 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
+                    <p className="mt-1 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
                   </div>
                 ))}
               </div>
@@ -346,7 +369,8 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
               bandProgression={resolveTaskBandProgression(feedback, "task1")}
               vocabulary={resolveTaskVocabulary(feedback, "task1")}
               advancedStructures={resolveTaskAdvancedStructures(feedback, "task1")}
-              editedEssay={resolveTaskEditedEssay(feedback, "task1")}
+              essayUpgrades={resolveTaskEssayUpgrades(feedback, "task1")}
+              legacyEditedEssay={resolveTaskEditedEssay(feedback, "task1")}
             />
           </div>
         )}
@@ -399,7 +423,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
             )}
 
             <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
-              <div className="bg-slate-50 px-5 py-3.5 border-b border-slate-100">
+              <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
                 <span className="font-bold text-slate-800">Điểm chi tiết</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-slate-100">
@@ -409,12 +433,11 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                   { label: "Lexical Resource", short: "LR", score: feedback.task2.LR },
                   { label: "Grammar", short: "GRA", score: feedback.task2.GRA },
                 ].map((item, i) => (
-                  <div key={i} className="relative p-5 text-center">
-                    <span className={`absolute inset-x-0 top-0 h-0.5 ${CRITERION_COLORS[i].accent}`} />
-                    <p className={`text-[11px] font-bold uppercase tracking-wider ${CRITERION_COLORS[i].text}`} title={item.label}>
+                  <div key={i} className="p-4 text-center">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400" title={item.label}>
                       {item.short}
                     </p>
-                    <p className="mt-1.5 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
+                    <p className="mt-1 text-2xl font-black text-slate-900">{formatBandScore(item.score)}</p>
                   </div>
                 ))}
               </div>
@@ -451,7 +474,8 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
               bandProgression={resolveTaskBandProgression(feedback, "task2")}
               vocabulary={resolveTaskVocabulary(feedback, "task2")}
               advancedStructures={resolveTaskAdvancedStructures(feedback, "task2")}
-              editedEssay={resolveTaskEditedEssay(feedback, "task2")}
+              essayUpgrades={resolveTaskEssayUpgrades(feedback, "task2")}
+              legacyEditedEssay={resolveTaskEditedEssay(feedback, "task2")}
             />
           </div>
         )}

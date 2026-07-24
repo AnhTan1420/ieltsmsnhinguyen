@@ -123,10 +123,16 @@ export async function POST(request: Request) {
           ...(fb1.advanced_structures || []).map((s: any) => ({ ...s, task: "task1" as const })),
           ...(fb2.advanced_structures || []).map((s: any) => ({ ...s, task: "task2" as const })),
         ],
+        essay_upgrades: [
+          ...(fb1.essay_upgrades || []).map((u: any) => ({ ...u, task: "task1" as const })),
+          ...(fb2.essay_upgrades || []).map((u: any) => ({ ...u, task: "task2" as const })),
+        ],
         task1_golden_rule: fb1.golden_rule,
         task2_golden_rule: fb2.golden_rule,
         task1_band_progression: fb1.band_progression,
         task2_band_progression: fb2.band_progression,
+        // edited_essay_markdown giữ lại làm fallback hiển thị cho dữ liệu CŨ —
+        // dữ liệu mới dùng "essay_upgrades" ở trên (có thể highlight trong bài).
         task1_edited_essay_markdown: fb1.edited_essay_markdown,
         task2_edited_essay_markdown: fb2.edited_essay_markdown,
       };
@@ -159,6 +165,7 @@ export async function POST(request: Request) {
         corrections: filterTrivialCorrections(raw.corrections || []).map((c: any) => ({ ...c, task: taskType })),
         vocabulary_suggestions: (raw.vocabulary_suggestions || []).map((v: any) => ({ ...v, task: taskType })),
         advanced_structures: (raw.advanced_structures || []).map((s: any) => ({ ...s, task: taskType })),
+        essay_upgrades: (raw.essay_upgrades || []).map((u: any) => ({ ...u, task: taskType })),
         task1: taskType === "task1" ? taskScoreObject : null,
         task2: taskType === "task2" ? taskScoreObject : null,
         ...(taskType === "task1"

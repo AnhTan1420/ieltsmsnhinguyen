@@ -78,6 +78,25 @@ export type AdvancedStructure = {
   structure_name: string;
   example_sentence_en: string;
   explanation_vi: string;
+  // Câu GỐC lấy nguyên văn từ bài làm học sinh mà cấu trúc này dùng để nâng
+  // cấp — dùng để highlight (xanh lá) đúng vị trí trong bài làm, bấm vào sẽ
+  // hiện chi tiết ở panel "Chi tiết phản hồi". Optional: nếu AI không tìm
+  // được câu gốc phù hợp (gợi ý mang tính tổng quát), để trống — khi đó gợi ý
+  // vẫn hiện trong danh sách "Cấu trúc nâng cao gợi ý" nhưng không highlight
+  // được trong bài làm.
+  original_sentence?: string;
+  task?: "task1" | "task2";
+};
+
+// Một lượt "nâng cấp câu" cụ thể: 1 câu ĐÃ ĐÚNG ngữ pháp trong bài học sinh
+// (original) được viết lại hay hơn (upgraded) — khác với Correction (dùng
+// cho câu SAI). Thay thế "edited_essay_markdown" (đoạn văn tự do, không định
+// vị được trong bài gốc) bằng mảng có cấu trúc để có thể highlight (xanh
+// dương) đúng câu gốc trong bài làm, giống cơ chế "corrections" đang làm.
+export type EssayUpgrade = {
+  original: string;
+  upgraded: string;
+  note: string;
   task?: "task1" | "task2";
 };
 
@@ -105,10 +124,12 @@ export type GradingFeedback = {
   prompt_analysis?: string;
   vocabulary_suggestions?: VocabularySuggestion[];
   advanced_structures?: AdvancedStructure[];
+  essay_upgrades?: EssayUpgrade[];
 
-  // Field cũ (chưa tách theo task) — chỉ còn đáng tin khi submission chỉ chấm
-  // 1 task. Với "both", ưu tiên các field "task1_..."/"task2_..." bên dưới,
-  // được route.ts điền riêng cho từng task kể từ khi vá lỗi mất dữ liệu khi gộp.
+  // Field cũ (chưa tách theo task, dạng đoạn văn tự do — không highlight được
+  // trong bài gốc) — chỉ còn dùng làm fallback hiển thị cho submission cũ đã
+  // chấm TRƯỚC khi có "essay_upgrades". Dữ liệu mới luôn ưu tiên các field
+  // "task1_..."/"task2_..." bên dưới.
   band_progression?: BandProgression;
   edited_essay_markdown?: string;
   golden_rule?: string;
