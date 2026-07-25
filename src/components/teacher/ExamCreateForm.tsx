@@ -254,7 +254,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
                   <ClipboardX className="h-4 w-4 text-cyan-600" /> Chặn copy/paste
                 </span>
                 <span className="block text-xs text-slate-400 mt-1">
-                  Khi bật, học sinh sẽ không thể sao chép/dán nội dung ở trang làm bài. Khi tắt, học sinh copy/paste bình thường.
+                  Khi bật, học sinh sẽ không thể copy/paste ở trang làm bài. Khi tắt, học sinh copy/paste bình thường.
                 </span>
               </span>
             </label>
