@@ -5,16 +5,18 @@ import { requireAuth } from "@/lib/auth-server";
 // Học sinh (ẩn danh, không có tài khoản) poll endpoint này sau khi nộp bài để
 // biết khi nào AI chấm xong + giáo viên đã viết nhận xét, không cần tải lại
 // trang. Public/no-auth giống PATCH bên dưới — chỉ ai biết đúng submissionId
-// (UUID nhận được lúc bắt đầu thi) mới xem được, và CHỈ trả về đúng những field
-// cần cho màn hình kết quả của học sinh — không lộ dữ liệu của bài khác hay các
-// cột nội bộ (content, warning_count...).
+// (UUID nhận được lúc bắt đầu thi) mới xem được. Ngoài các field hiển thị kết
+// quả, còn trả thêm student_name, content (bài làm thô) và đề bài/ảnh Task 1
+// (qua join tests) — CHỈ để phục vụ nút "Xuất file" phía học sinh (dùng lại
+// đúng hàm downloadSubmissionDoc bên giáo viên), không lộ các cột nội bộ khác
+// (warning_count, end_reason...).
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabaseAdmin = getSupabaseAdmin();
 
   const { data: submission, error } = await supabaseAdmin
     .from("submissions")
-    .select("status, feedback, teacher_comment, submitted_at")
+    .select("status, feedback, teacher_comment, submitted_at, student_name, content, tests(task1_prompt, task2_prompt, image_url)")
     .eq("id", id)
     .single();
 
@@ -27,6 +29,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     feedback: submission.feedback,
     teacher_comment: submission.teacher_comment,
     submitted_at: submission.submitted_at,
+    student_name: submission.student_name,
+    content: submission.content,
+    tests: submission.tests,
   });
 }
 

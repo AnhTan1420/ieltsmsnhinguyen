@@ -13,6 +13,10 @@ type PollResult = {
   status?: string;
   feedback: GradingFeedback | null;
   teacher_comment: string | null;
+  // Thêm để phục vụ nút "Xuất file" — xem downloadSubmissionDoc trong StudentResultPanel.
+  student_name?: string;
+  content?: string | null;
+  tests?: { task1_prompt: string; task2_prompt: string; image_url: string | null } | null;
 };
 
 // Kết quả chỉ được coi là "sẵn sàng" hiển thị khi CẢ HAI điều kiện sau đều
@@ -98,7 +102,13 @@ export default function SubmittedScreen({ submissionId }: { submissionId: string
             <CheckCircle2 className="h-5 w-5" />
             Bài của bạn đã được chấm xong!
           </div>
-          <StudentResultPanel feedback={result.feedback} teacherComment={result.teacher_comment} />
+          <StudentResultPanel
+            feedback={result.feedback}
+            teacherComment={result.teacher_comment}
+            studentName={result.student_name}
+            content={result.content}
+            tests={result.tests}
+          />
         </>
       )}
     </main>

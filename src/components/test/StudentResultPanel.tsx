@@ -1,16 +1,26 @@
 "use client";
 
-import { Sparkles, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Sparkles, MessageCircle, FileDown, Loader2 } from "lucide-react";
 import type { GradingFeedback } from "@/lib/types";
 import {
   resolveTaskSummary,
   formatBandScore,
 } from "@/components/teacher/GradingResultPanel";
 import ExaminerSummaryCard from "@/components/teacher/ExaminerSummaryCard";
+import { parseSubmissionContent } from "@/lib/grading/parse";
+import { downloadSubmissionDoc } from "@/lib/teacher/exportDoc";
 
 type StudentResultPanelProps = {
   feedback: GradingFeedback;
   teacherComment?: string | null;
+  // Dữ liệu thêm để dựng file export — cùng cấu trúc ExportSections bên
+  // giáo viên, cho phép tái dùng NGUYÊN VẸN downloadSubmissionDoc() để file
+  // học sinh tải về khớp 100% với file giáo viên tải (đề bài, ảnh Task 1,
+  // bài làm, toàn bộ feedback chi tiết — không phải bản rút gọn trên UI này).
+  studentName?: string;
+  content?: string | null;
+  tests?: { task1_prompt: string; task2_prompt: string; image_url: string | null } | null;
 };
 
 // Khối điểm 1 Task (band + 4 tiêu chí) — bản rút gọn cho học sinh, không có số
@@ -63,9 +73,43 @@ function TaskScoreBlock({
 // xuất sửa" chi tiết theo từng câu, cấu trúc nâng cao, nâng cấp từ vựng...
 // — những phần đó thiên về công cụ soạn giáo án hơn, học sinh chỉ cần thấy rõ
 // điểm số + nhận xét theo từng tiêu chí.
-export default function StudentResultPanel({ feedback, teacherComment }: StudentResultPanelProps) {
+export default function StudentResultPanel({
+  feedback,
+  teacherComment,
+  studentName,
+  content,
+  tests,
+}: StudentResultPanelProps) {
   const task1Summary = feedback.task1 ? resolveTaskSummary(feedback, "task1") : null;
   const task2Summary = feedback.task2 ? resolveTaskSummary(feedback, "task2") : null;
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Chỉ hiện nút xuất file khi có đủ dữ liệu để dựng file (tên học sinh + đề
+  // thi) — dữ liệu cũ (poll trước khi API trả thêm field) sẽ không có, nút tự
+  // ẩn thay vì tải ra file thiếu đề bài.
+  const canExport = Boolean(studentName && tests);
+
+  const handleExport = async () => {
+    if (!canExport || isExporting) return;
+    setIsExporting(true);
+    try {
+      const parsed = parseSubmissionContent(content);
+      await downloadSubmissionDoc(
+        studentName!,
+        {
+          task1Prompt: tests?.task1_prompt,
+          task1ImageUrl: tests?.image_url,
+          task1Answer: parsed.task1Answer,
+          task2Prompt: tests?.task2_prompt,
+          task2Answer: parsed.task2Answer,
+          teacherComment: teacherComment ?? undefined,
+        },
+        feedback,
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-3xl rounded-3xl border border-cyan-200/60 bg-gradient-to-br from-cyan-50/80 to-white overflow-hidden shadow-sm text-left">
@@ -84,6 +128,20 @@ export default function StudentResultPanel({ feedback, teacherComment }: Student
           <span className="text-2xl font-black text-cyan-400">{formatBandScore(feedback.overall_band)}</span>
         </div>
       </div>
+
+      {canExport && (
+        <div className="px-6 pt-5 -mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex items-center justify-center gap-2 rounded-xl bg-white border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-slate-50 hover:text-cyan-700 hover:border-cyan-200 disabled:opacity-50"
+          >
+            {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+            Xuất file kết quả
+          </button>
+        </div>
+      )}
 
       <div className="p-6 space-y-10">
         {feedback.task1 && (
