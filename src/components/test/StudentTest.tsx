@@ -24,8 +24,8 @@ export interface StudentTestProps {
 
 type Step = "setup" | "testing" | "submitted" | "disqualified";
 
-// Cấu hình thời gian lưu trữ màn hình chờ/kết quả (5 phút = 5 * 60 * 1000)
-const RESULT_EXPIRY_TIME_MS = 5 * 60 * 1000;
+// Cấu hình thời gian lưu trữ màn hình chờ/kết quả (1 tiếng = 60 phút * 60 giây * 1000 ms)
+const RESULT_EXPIRY_TIME_MS = 60 * 60 * 1000;
 const getStorageKey = (testId: string) => `test_submission_state_${testId}`;
 
 export default function StudentTest({
