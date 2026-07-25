@@ -18,6 +18,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
 
   const [editingTest, setEditingTest] = useState<Partial<TestRow> | null>(null);
   const [isSavingTest, setIsSavingTest] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -59,6 +60,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
     if (!editingTest?.title) return;
 
     setIsSavingTest(true);
+    setJustSaved(false);
 
     const testData = {
       title: editingTest.title,
@@ -71,18 +73,30 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
     };
 
     let responseError = null;
+    let savedId = editingTest.id;
+
     if (editingTest.id) {
       const { error: updateError } = await supabase.from("tests").update(testData).eq("id", editingTest.id);
       responseError = updateError;
     } else {
-      const { error: insertError } = await supabase.from("tests").insert([testData]);
+      // .select().single() để lấy lại id vừa tạo — cần id này để nút "Copy Link"
+      // hiện ra ngay sau lần lưu đầu tiên, và để lần "Lưu Đề thi" tiếp theo là
+      // update (có id) thay vì insert thêm 1 bản ghi trùng.
+      const { data: insertedData, error: insertError } = await supabase.from("tests").insert([testData]).select().single();
       responseError = insertError;
+      if (!insertError && insertedData) savedId = insertedData.id;
     }
 
     setIsSavingTest(false);
     if (responseError) onError(responseError.message);
     else {
-      setEditingTest(null);
+      // Giữ nguyên panel "Chỉnh sửa Đề thi" thay vì tự động đóng về danh sách —
+      // giáo viên thường lưu rồi xem/sửa tiếp ngay, đóng panel làm mất ngữ cảnh
+      // và phải bấm lại "Sửa đề" từ danh sách. Chỉ cập nhật id (nếu là đề mới)
+      // và hiện chữ "Đã lưu" thoáng qua để xác nhận việc lưu đã thành công.
+      setEditingTest({ ...editingTest, id: savedId });
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
       void loadTests();
     }
   };
@@ -315,7 +329,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
                 disabled={isSavingTest}
                 className="flex-[2] rounded-xl bg-cyan-500 py-3.5 text-sm font-bold text-slate-900 hover:bg-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all disabled:opacity-50"
               >
-                {isSavingTest ? "Đang lưu..." : "Lưu Đề thi"}
+                {isSavingTest ? "Đang lưu..." : justSaved ? "✓ Đã lưu" : "Lưu Đề thi"}
               </button>
             </div>
 
