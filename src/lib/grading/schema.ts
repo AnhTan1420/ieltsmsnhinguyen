@@ -90,7 +90,7 @@ export function buildGradingJsonSchema(taskType: TaskType) {
             explanation_vi: { type: "string" },
             original_sentence: { type: "string" },
           },
-          required: ["structure_name", "example_sentence_en", "explanation_vi"],
+          required: ["structure_name", "example_sentence_en", "explanation_vi", "original_sentence"],
         },
       },
       golden_rule: { type: "string" },
