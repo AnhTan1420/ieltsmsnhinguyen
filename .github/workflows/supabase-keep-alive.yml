@@ -22,7 +22,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Cài @supabase/supabase-js
         run: npm install @supabase/supabase-js --no-save
