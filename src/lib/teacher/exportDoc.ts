@@ -184,10 +184,10 @@ function buildTaskSectionsHtml(
 
   html += `<h3 style="font-size:12.5pt;color:#0f172a;border-left:4px solid #06b6d4;padding-left:9px;margin:0 0 8px 0;">TASK 1</h3>`;
   if (sections.task1Prompt) {
-    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+    html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tr><td style="background:#f8fafc;border:1px solid #e2e8f0;padding:9px 11px;">
       <p style="margin:0 0 3px 0;font-size:8.5pt;font-weight:bold;color:#64748b;letter-spacing:0.03em;text-transform:uppercase;">Đề bài</p>
       <p style="margin:0;white-space:pre-wrap;font-size:10.5pt;line-height:1.45;">${escapeHtml(sections.task1Prompt)}</p>
-    </div>`;
+    </td></tr></table>`;
   }
   if (sections.task1ImageUrl) {
     const widthAttr = sections.task1ImageWidth ? ` width="${sections.task1ImageWidth}"` : "";
@@ -201,23 +201,27 @@ function buildTaskSectionsHtml(
   }
   html += `<div style="margin-bottom:14px;">
     <p style="margin:0 0 4px 0;font-size:8.5pt;font-weight:bold;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">Bài làm học sinh</p>
-    <div style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.5;background:#fcfcfc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;color:#1e293b;">${
+    <table style="width:100%;border-collapse:collapse;"><tr><td style="background:#fcfcfc;border:1px solid #e2e8f0;padding:12px;">
+    <p style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.6;color:#1e293b;margin:0;">${
       sections.task1Answer ? highlightAnswerHtml(sections.task1Answer, task1Corrections) : "<i>Học sinh chưa làm Task 1</i>"
-    }</div>
+    }</p>
+    </td></tr></table>
   </div>`;
 
   html += `<h3 style="font-size:12.5pt;color:#0f172a;border-left:4px solid #06b6d4;padding-left:9px;margin:0 0 8px 0;">TASK 2</h3>`;
   if (sections.task2Prompt) {
-    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+    html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tr><td style="background:#f8fafc;border:1px solid #e2e8f0;padding:9px 11px;">
       <p style="margin:0 0 3px 0;font-size:8.5pt;font-weight:bold;color:#64748b;letter-spacing:0.03em;text-transform:uppercase;">Đề bài</p>
       <p style="margin:0;white-space:pre-wrap;font-size:10.5pt;line-height:1.45;">${escapeHtml(sections.task2Prompt)}</p>
-    </div>`;
+    </td></tr></table>`;
   }
   html += `<div style="margin-bottom:14px;">
     <p style="margin:0 0 4px 0;font-size:8.5pt;font-weight:bold;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">Bài làm học sinh</p>
-    <div style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.5;background:#fcfcfc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;color:#1e293b;">${
+    <table style="width:100%;border-collapse:collapse;"><tr><td style="background:#fcfcfc;border:1px solid #e2e8f0;padding:12px;">
+    <p style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.6;color:#1e293b;margin:0;">${
       sections.task2Answer ? highlightAnswerHtml(sections.task2Answer, task2Corrections) : "<i>Học sinh chưa làm Task 2</i>"
-    }</div>
+    }</p>
+    </td></tr></table>
   </div>`;
 
   return html;
