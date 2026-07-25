@@ -213,3 +213,13 @@ alter table public.submissions
 -- Nếu tính năng lớp học sắp được dùng thật, nói mình biết để viết luôn phần
 -- RLS lọc theo class_id + cập nhật TestRow/SubmissionRow trong types.ts.
 -- ============================================================================
+-- ----------------------------------------------------------------------------
+-- 6) TÍNH NĂNG "CHẶN COPY/PASTE" — checkbox trong panel "Chỉnh sửa Đề thi"
+--
+-- Thêm cột boolean trên bảng tests để giáo viên bật/tắt việc chặn copy/paste
+-- ở trang làm bài của học sinh (StudentTest.tsx), theo từng đề thi riêng.
+-- Mặc định false (không chặn) để không ảnh hưởng các đề thi đã tạo trước đó.
+-- ----------------------------------------------------------------------------
+
+alter table public.tests
+  add column if not exists block_copy_paste boolean not null default false;
