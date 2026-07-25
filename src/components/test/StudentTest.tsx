@@ -24,6 +24,10 @@ export interface StudentTestProps {
 
 type Step = "setup" | "testing" | "submitted" | "disqualified";
 
+// Cấu hình thời gian lưu trữ màn hình chờ/kết quả (5 phút = 5 * 60 * 1000)
+const RESULT_EXPIRY_TIME_MS = 5 * 60 * 1000;
+const getStorageKey = (testId: string) => `test_submission_state_${testId}`;
+
 export default function StudentTest({
   testId,
   title,
@@ -47,6 +51,41 @@ export default function StudentTest({
   const task1Ref = useRef<HTMLElement | null>(null);
   const task2Ref = useRef<HTMLElement | null>(null);
   const submitRef = useRef<HTMLDivElement | null>(null);
+
+  // LOGIC KIỂM TRA TRẠNG THÁI LƯU TRỮ (LOCALSTORAGE) KHI TRANG VỪA LOAD
+  useEffect(() => {
+    if (!testId) return;
+
+    const storageKey = getStorageKey(testId);
+    const storedData = localStorage.getItem(storageKey);
+
+    if (storedData) {
+      try {
+        const parsed = JSON.parse(storedData);
+        const currentTime = new Date().getTime();
+
+        if (currentTime < parsed.expiryTime) {
+          // Còn hạn: Khôi phục lại trạng thái "submitted"
+          setStep(parsed.step);
+          setSubmissionId(parsed.submissionId);
+
+          // Cài đặt bộ đếm giờ tự động reset khi đúng 5 phút trôi qua (khi user đang treo máy ở trang kết quả)
+          const timeRemaining = parsed.expiryTime - currentTime;
+          const timer = setTimeout(() => {
+            localStorage.removeItem(storageKey);
+            window.location.reload(); 
+          }, timeRemaining);
+
+          return () => clearTimeout(timer);
+        } else {
+          // Hết hạn (> 5 phút): Xóa dữ liệu cũ, hệ thống tự động ở màn "setup" để làm bài lại
+          localStorage.removeItem(storageKey);
+        }
+      } catch (err) {
+        localStorage.removeItem(storageKey);
+      }
+    }
+  }, [testId]);
 
   // Keep the latest answers in refs so the timer's onExpire callback (created once)
   // can always read the current text without needing to be re-created every keystroke.
@@ -94,13 +133,22 @@ export default function StudentTest({
 
         await exitFullscreenSafe();
         setStep("submitted");
+
+        // Ghi lại trạng thái vào bộ nhớ cục bộ để chống F5 (Lưu trong 5 phút)
+        const storageKey = getStorageKey(testId);
+        localStorage.setItem(storageKey, JSON.stringify({
+          step: "submitted",
+          submissionId,
+          expiryTime: new Date().getTime() + RESULT_EXPIRY_TIME_MS,
+        }));
+
       } catch (err) {
         setError(err instanceof Error ? err.message : "Có lỗi xảy ra khi nộp bài.");
       } finally {
         setIsSubmitting(false);
       }
     },
-    [submissionId, buildCombinedContent],
+    [submissionId, buildCombinedContent, testId],
   );
 
   const handleTimeExpired = useCallback(() => {
@@ -167,11 +215,6 @@ export default function StudentTest({
     setError(null);
 
     try {
-      // Cố gắng bật fullscreen ngay lập tức (cần gọi đồng bộ ngay trong handler
-      // click/submit do quy tắc bảo mật của trình duyệt về requestFullscreen()).
-      // Trên các thiết bị không hỗ trợ (ví dụ Safari iOS), hàm này sẽ không throw
-      // mà chỉ trả về false, bài thi vẫn tiếp tục bình thường - chỉ là không
-      // ở chế độ toàn màn hình. Việc giám sát chuyển tab/thoát app vẫn hoạt động.
       await enterFullscreen();
 
       const response = await fetch("/api/submissions", {
@@ -235,8 +278,6 @@ export default function StudentTest({
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
-      {/* Thanh trên cùng dính đầu trang: đồng hồ luôn hiển thị dù cuộn xuống Task 2,
-          tránh học sinh phải kéo lên để biết còn bao nhiêu thời gian. */}
       <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0b0f17]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0b0f17]/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
           <div className="min-w-0">
@@ -263,8 +304,6 @@ export default function StudentTest({
           </div>
         </div>
 
-        {/* Sub-nav: nhảy nhanh giữa các phần, không mất dấu đang làm tới đâu.
-            Chỉ hiện pill của task thực sự tồn tại trong đề (đề có thể chỉ có Task 2). */}
         <div className="border-t border-white/5">
           <div className="no-scrollbar mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto px-6 py-2.5">
             {hasTask1 && <NavPill label="Task 1" done={task1Words > 0} onClick={() => scrollToRef(task1Ref)} />}
