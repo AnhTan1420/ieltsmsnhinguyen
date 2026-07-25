@@ -430,7 +430,7 @@ function buildFeedbackHtml(feedback: GradingFeedback, task1Answer?: string, task
   // dùng table 2 cột đảm bảo 2 phần luôn nằm ngang hàng khi mở bằng Word thật.
   html += `<table style="width:100%;background:#0f172a;border-radius:10px;border-collapse:collapse;margin-bottom:12px;">
     <tr>
-      <td style="padding:10px 14px;color:#e2e8f0;font-size:11pt;font-weight:bold;">Đánh giá từ AI Examiner</td>
+      <td style="padding:10px 14px;color:#e2e8f0;font-size:11pt;font-weight:bold;">Đánh giá Examiner</td>
       <td style="padding:10px 14px;color:#22d3ee;font-size:16pt;font-weight:bold;text-align:right;">Overall ${showBand(feedback.overall_band)}</td>
     </tr>
   </table>`;
