@@ -222,7 +222,7 @@ export default function StudentTest({
   }
 
   if (step === "submitted") {
-    return <SubmittedScreen />;
+    return <SubmittedScreen submissionId={submissionId} />;
   }
 
   // ==========================================

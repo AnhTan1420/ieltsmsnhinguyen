@@ -2,6 +2,34 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { requireAuth } from "@/lib/auth-server";
 
+// Học sinh (ẩn danh, không có tài khoản) poll endpoint này sau khi nộp bài để
+// biết khi nào AI chấm xong + giáo viên đã viết nhận xét, không cần tải lại
+// trang. Public/no-auth giống PATCH bên dưới — chỉ ai biết đúng submissionId
+// (UUID nhận được lúc bắt đầu thi) mới xem được, và CHỈ trả về đúng những field
+// cần cho màn hình kết quả của học sinh — không lộ dữ liệu của bài khác hay các
+// cột nội bộ (content, warning_count...).
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const { data: submission, error } = await supabaseAdmin
+    .from("submissions")
+    .select("status, feedback, teacher_comment, submitted_at")
+    .eq("id", id)
+    .single();
+
+  if (error || !submission) {
+    return NextResponse.json({ error: "Submission not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    status: submission.status,
+    feedback: submission.feedback,
+    teacher_comment: submission.teacher_comment,
+    submitted_at: submission.submitted_at,
+  });
+}
+
 // Periodic autosave while the student is typing. This is what lets the teacher
 // dashboard show the essay "live" before it's submitted.
 //
