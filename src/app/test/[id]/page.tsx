@@ -7,6 +7,8 @@ const isValidUUID = (str: string) => {
   return regex.test(str);
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function TestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   

@@ -26,7 +26,7 @@ export interface StudentTestProps {
 type Step = "setup" | "testing" | "submitted" | "disqualified";
 
 // Cấu hình thời gian lưu trữ màn hình chờ/kết quả (1 tiếng = 60 phút * 60 giây * 1000 ms)
-const RESULT_EXPIRY_TIME_MS = 5 * 60 * 1000;
+const RESULT_EXPIRY_TIME_MS = 60 * 60 * 1000;
 const getStorageKey = (testId: string) => `test_submission_state_${testId}`;
 
 export default function StudentTest({
@@ -111,23 +111,47 @@ export default function StudentTest({
   // bài (step "testing"); chỉ ngăn hành vi mặc định của trình duyệt, không chặn
   // gõ phím bình thường. Tắt cờ này thì không gắn listener nào -> copy/paste
   // hoạt động bình thường như cũ.
+  //
+  // Gắn ở CAPTURE PHASE (tham số thứ 3 = true) thay vì bubble mặc định, để
+  // listener này chạy SỚM NHẤT trong pha capture, trước khi sự kiện lan tới
+  // bất kỳ phần tử con nào (textarea, input...) — tránh trường hợp 1 handler
+  // khác gọi stopPropagation() khiến document không nhận được sự kiện nữa.
+  const blockCopyPasteRef = useRef(blockCopyPaste);
   useEffect(() => {
-    if (!blockCopyPaste || step !== "testing") return;
+    blockCopyPasteRef.current = blockCopyPaste;
+  }, [blockCopyPaste]);
+
+  useEffect(() => {
+    if (step !== "testing") return;
 
     const preventClipboardAction = (e: ClipboardEvent) => {
+      if (!blockCopyPasteRef.current) return;
       e.preventDefault();
+      e.stopPropagation();
     };
 
-    document.addEventListener("copy", preventClipboardAction);
-    document.addEventListener("paste", preventClipboardAction);
-    document.addEventListener("cut", preventClipboardAction);
+    document.addEventListener("copy", preventClipboardAction, true);
+    document.addEventListener("paste", preventClipboardAction, true);
+    document.addEventListener("cut", preventClipboardAction, true);
 
     return () => {
-      document.removeEventListener("copy", preventClipboardAction);
-      document.removeEventListener("paste", preventClipboardAction);
-      document.removeEventListener("cut", preventClipboardAction);
+      document.removeEventListener("copy", preventClipboardAction, true);
+      document.removeEventListener("paste", preventClipboardAction, true);
+      document.removeEventListener("cut", preventClipboardAction, true);
     };
-  }, [blockCopyPaste, step]);
+  }, [step]);
+
+  // Lớp phòng thủ thứ 2, gắn thẳng trên React onCopy/onPaste/onCut của <form> làm
+  // bài (xem bên dưới) — dùng cùng cờ blockCopyPaste, phòng khi 1 phần tử con
+  // nào đó (vd thư viện textarea) chặn sự kiện lan tới document ở trên.
+  const handleClipboardEvent = useCallback(
+    (e: React.ClipboardEvent) => {
+      if (blockCopyPaste && step === "testing") {
+        e.preventDefault();
+      }
+    },
+    [blockCopyPaste, step],
+  );
 
   const buildCombinedContent = useCallback(
     (t1: string, t2: string) =>
@@ -385,7 +409,7 @@ export default function StudentTest({
           </div>
         )}
 
-        <form onSubmit={handleSubmitFinal} className="space-y-8">
+        <form onSubmit={handleSubmitFinal} onCopy={handleClipboardEvent} onPaste={handleClipboardEvent} onCut={handleClipboardEvent} className="space-y-8">
           {hasTask1 && (
             <TaskCard
               taskNumber={1}
