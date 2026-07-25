@@ -6,6 +6,42 @@ import type { TaskType } from "./prompt";
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * Chuẩn hoá xuống dòng trong bài làm học sinh trước khi hiển thị/export.
+ *
+ * Vấn đề: UI (và file .doc export) dùng `white-space: pre-wrap`, nên MỌI ký tự
+ * \n trong content thô đều lộ ra thành 1 dòng mới — kể cả những chỗ học sinh
+ * chỉ lỡ tay Enter giữa câu (rất hay gặp khi gõ trong textarea, đặc biệt trên
+ * điện thoại), khiến câu văn bị cắt ngang giữa chừng dù không hề có ý tách
+ * đoạn ở đó (ví dụ ảnh chụp màn hình học sinh gửi: "...in cities. While" xuống
+ * dòng rồi mới tới "rural areas provide...").
+ *
+ * Một đoạn văn MỚI chỉ được coi là bắt đầu khi:
+ *  (1) có dòng trống ở giữa (2+ dấu \n liền nhau), hoặc
+ *  (2) dòng tiếp theo có thụt đầu dòng (tab/nhiều khoảng trắng) — quy ước
+ *      nhiều học sinh vẫn dùng để đánh dấu đoạn mới, giống bài trong ảnh có
+ *      dòng "    In the countryside,...".
+ * Mọi dấu \n đơn còn lại (không khớp 2 điều kiện trên) được coi là ngắt dòng
+ * "mềm" không chủ ý, gộp lại thành khoảng trắng để câu liền mạch trở lại.
+ */
+function normalizeParagraphBreaks(text: string): string {
+  if (!text) return text;
+
+  const PARA_MARKER = "\u0000PARA\u0000";
+  const withMarkers = text.replace(/\n{2,}/g, PARA_MARKER).replace(/\n(?=[ \t]+\S)/g, PARA_MARKER);
+
+  return withMarkers
+    .split(PARA_MARKER)
+    .map((paragraph) =>
+      paragraph
+        .replace(/[ \t]*\n[ \t]*/g, " ") // gộp \n đơn còn lại + khoảng trắng quanh nó thành 1 dấu cách
+        .replace(/^[ \t]+/, "") // bỏ thụt đầu dòng gốc — để CSS/định dạng lo phần hiển thị, không lưu bằng khoảng trắng thô
+        .trim(),
+    )
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+/**
  * Tách nội dung bài làm thô (chứa === THÔNG TIN HỌC SINH ===, === TASK 1 ===, === TASK 2 ===)
  * thành 2 phần: bài làm Task 1 và bài làm Task 2, bỏ hẳn khối thông tin học sinh khỏi hiển thị.
  */
@@ -24,12 +60,12 @@ export function parseSubmissionContent(raw: string | null | undefined) {
     return content.slice(afterMarker, endIdx).trim();
   };
 
-  const task1Answer = extract("=== TASK 1 ===", ["=== TASK 2 ==="]);
-  const task2Answer = extract("=== TASK 2 ===", []);
+  const task1Answer = normalizeParagraphBreaks(extract("=== TASK 1 ===", ["=== TASK 2 ==="]));
+  const task2Answer = normalizeParagraphBreaks(extract("=== TASK 2 ===", []));
 
   // Fallback cho bài làm cũ không có marker: coi toàn bộ nội dung là Task 2
   if (!task1Answer && !task2Answer && content.trim() && !content.includes("=== TASK")) {
-    return { task1Answer: "", task2Answer: content.trim() };
+    return { task1Answer: "", task2Answer: normalizeParagraphBreaks(content.trim()) };
   }
 
   return { task1Answer, task2Answer };
