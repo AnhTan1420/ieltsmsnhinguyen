@@ -373,15 +373,6 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
               )}
             </div>
 
-            {task1Summary && (
-              <ExaminerSummaryCard
-                summary={task1Summary}
-                validBands={[feedback.task1.TA, feedback.task1.CC, feedback.task1.LR, feedback.task1.GRA].filter(
-                  (n): n is number => typeof n === "number",
-                )}
-              />
-            )}
-
             <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
               <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
                 <span className="font-bold text-slate-800">Điểm chi tiết</span>
@@ -402,6 +393,15 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                 ))}
               </div>
             </div>
+
+            {task1Summary && (
+              <ExaminerSummaryCard
+                summary={task1Summary}
+                validBands={[feedback.task1.TA, feedback.task1.CC, feedback.task1.LR, feedback.task1.GRA].filter(
+                  (n): n is number => typeof n === "number",
+                )}
+              />
+            )}
 
             <CorrectionsSection corrections={task1Corrections} />
 
@@ -454,15 +454,6 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
               )}
             </div>
 
-            {task2Summary && (
-              <ExaminerSummaryCard
-                summary={task2Summary}
-                validBands={[feedback.task2.TR, feedback.task2.CC, feedback.task2.LR, feedback.task2.GRA].filter(
-                  (n): n is number => typeof n === "number",
-                )}
-              />
-            )}
-
             <div className="rounded-2xl bg-white border border-slate-200/60 shadow-sm overflow-hidden">
               <div className="bg-slate-50 px-5 py-3 border-b border-slate-100">
                 <span className="font-bold text-slate-800">Điểm chi tiết</span>
@@ -483,6 +474,15 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
                 ))}
               </div>
             </div>
+
+            {task2Summary && (
+              <ExaminerSummaryCard
+                summary={task2Summary}
+                validBands={[feedback.task2.TR, feedback.task2.CC, feedback.task2.LR, feedback.task2.GRA].filter(
+                  (n): n is number => typeof n === "number",
+                )}
+              />
+            )}
 
             <CorrectionsSection corrections={task2Corrections} />
 
