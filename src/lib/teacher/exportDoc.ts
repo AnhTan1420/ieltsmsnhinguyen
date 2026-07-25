@@ -14,6 +14,7 @@ import {
 } from "@/components/teacher/GradingResultPanel";
 import { parseExaminerSummary } from "@/components/teacher/ExaminerSummaryCard";
 import { sanitizeBandMentions } from "@/components/teacher/band-sanitizer";
+import { countWords } from "@/components/teacher/submission-utils";
 
 // Font dùng cho toàn bộ file export — Geist Sans (font của UI web) không có sẵn
 // trong Word, nên dùng bộ font sans-serif hiện đại, rõ nét gần nhất mà máy nào
@@ -227,13 +228,14 @@ function buildTaskSectionsHtml(
   return html;
 }
 
-// Icon (emoji) tương ứng với icon lucide-react dùng trên UI (ExaminerSummaryCard) —
-// Word không render được SVG lucide nên dùng emoji để giữ cảm giác trực quan.
-function criterionEmoji(label: string) {
-  if (/Task Achievement|Task Response/i.test(label)) return "🎯";
-  if (/Coherence/i.test(label)) return "🔗";
-  if (/Lexical/i.test(label)) return "📖";
-  return "✍️";
+// Icon + màu tương ứng với criterionIcon() trong ExaminerSummaryCard.tsx (mỗi tiêu
+// chí 1 màu riêng: cyan/tím/vàng/xanh lá) — Word không render được SVG lucide nên
+// dùng emoji để giữ cảm giác trực quan, nhưng vẫn giữ đúng bộ màu accent như web.
+function criterionStyle(label: string): { emoji: string; accent: string; bg: string; color: string } {
+  if (/Task Achievement|Task Response/i.test(label)) return { emoji: "🎯", accent: "#22d3ee", bg: "#cffafe", color: "#0891b2" };
+  if (/Coherence/i.test(label)) return { emoji: "🔗", accent: "#a78bfa", bg: "#ede9fe", color: "#7c3aed" };
+  if (/Lexical/i.test(label)) return { emoji: "📖", accent: "#fbbf24", bg: "#fef3c7", color: "#d97706" };
+  return { emoji: "✍️", accent: "#34d399", bg: "#d1fae5", color: "#059669" };
 }
 function diagnosisStyle(label: string | null): { emoji: string; bg: string; border: string; color: string } {
   if (label && /Lỗi chí mạng/i.test(label)) return { emoji: "⚠️", bg: "#fef2f2", border: "#fecaca", color: "#b91c1c" };
@@ -249,6 +251,19 @@ function renderInlineHtml(text: string): string {
   return escapeHtml(text).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
 }
 
+// Card viền bo góc + thanh tiêu đề nền xám nhạt — DÙNG CHUNG cho mọi khối trong
+// TaskExtras (Lộ trình lên band / Nâng cấp từ vựng / Cấu trúc nâng cao / Câu viết
+// lại) để khớp đúng kiểu "rounded-2xl border + bg-slate-50 header" trên web, thay
+// vì mỗi khối tự vẽ 1 kiểu khác nhau như bản cũ.
+function cardWrapper(title: string, emoji: string, innerHtml: string): string {
+  return `<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+    <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid #f1f5f9;">
+      <span style="font-size:10.5pt;font-weight:bold;color:#1e293b;">${emoji} ${escapeHtml(title)}</span>
+    </div>
+    ${innerHtml}
+  </div>`;
+}
+
 function buildGoldenRuleHtml(goldenRule?: string): string {
   if (!goldenRule) return "";
   return `<div style="border-left:3px solid #fbbf24;background:#fff;border:1px solid #fef3c7;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
@@ -259,88 +274,105 @@ function buildGoldenRuleHtml(goldenRule?: string): string {
 
 function buildBandProgressionHtml(bp?: BandProgression): string {
   if (!bp) return "";
-  let html = `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
-    <p style="margin:0 0 6px 0;font-size:10.5pt;font-weight:bold;color:#0f172a;">🧭 Lộ trình lên band</p>
-    <p style="margin:0 0 4px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong>Vì sao đang ở band này:</strong> ${escapeHtml(bp.why_current)}</p>
-    <p style="margin:0 0 4px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong>Vì sao chưa thấp hơn:</strong> ${escapeHtml(bp.why_not_lower)}</p>
-    <p style="margin:0 0 4px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong>Vì sao chưa cao hơn:</strong> ${escapeHtml(bp.why_not_higher)}</p>`;
+  let inner = `<div style="padding:12px 14px;">
+    <p style="margin:0 0 6px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong style="color:#334155;">Vì sao đang ở band này: </strong>${escapeHtml(bp.why_current)}</p>
+    <p style="margin:0 0 6px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong style="color:#334155;">Vì sao chưa thấp hơn: </strong>${escapeHtml(bp.why_not_lower)}</p>
+    <p style="margin:0;font-size:10pt;line-height:1.5;color:#334155;"><strong style="color:#334155;">Vì sao chưa cao hơn: </strong>${escapeHtml(bp.why_not_higher)}</p>`;
   if (bp.roadmap_steps?.length > 0) {
-    html += `<p style="margin:6px 0 3px 0;font-size:10pt;font-weight:bold;color:#1e293b;">Việc cần làm tiếp theo:</p><ol style="margin:0;padding-left:18px;">`;
+    inner += `<p style="margin:10px 0 3px 0;font-size:10pt;font-weight:bold;color:#1e293b;">Việc cần làm tiếp theo:</p><ol style="margin:0;padding-left:18px;">`;
     bp.roadmap_steps.forEach((step) => {
-      html += `<li style="font-size:10pt;line-height:1.5;color:#475569;margin-bottom:2px;">${escapeHtml(step)}</li>`;
+      inner += `<li style="font-size:10pt;line-height:1.5;color:#475569;margin-bottom:2px;">${escapeHtml(step)}</li>`;
     });
-    html += `</ol>`;
+    inner += `</ol>`;
   }
-  html += `</div>`;
-  return html;
+  inner += `</div>`;
+  return cardWrapper("Lộ trình lên band", "🧭", inner);
 }
 
 function buildVocabularyHtml(vocab: VocabularySuggestion[]): string {
   if (vocab.length === 0) return "";
-  let html = `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">📖 Nâng cấp từ vựng</p>`;
-  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">`;
-  vocab.forEach((v) => {
-    html += `<tr>
-      <td style="border:1px solid #e2e8f0;padding:5px 8px;font-size:9.5pt;color:#b91c1c;text-decoration:line-through;">${escapeHtml(v.original_word)}</td>
-      <td style="border:1px solid #e2e8f0;padding:5px 8px;font-size:9.5pt;font-weight:bold;color:#047857;">${escapeHtml(v.better_alternative)}</td>
-      <td style="border:1px solid #e2e8f0;padding:5px 8px;font-size:9.5pt;color:#475569;">${escapeHtml(v.reason)}</td>
-    </tr>`;
+  let inner = "";
+  vocab.forEach((v, i) => {
+    inner += `<table style="width:100%;border-collapse:collapse;${i > 0 ? "border-top:1px solid #f1f5f9;" : ""}"><tr>
+      <td style="padding:10px 14px;width:26%;vertical-align:top;font-size:9.5pt;color:#dc2626;text-decoration:line-through;">${escapeHtml(v.original_word)}</td>
+      <td style="padding:10px 6px;width:26%;vertical-align:top;font-size:9.5pt;font-weight:bold;color:#047857;">${escapeHtml(v.better_alternative)}</td>
+      <td style="padding:10px 14px;vertical-align:top;font-size:9.5pt;color:#64748b;">${escapeHtml(v.reason)}</td>
+    </tr></table>`;
   });
-  html += `</table>`;
-  return html;
+  return cardWrapper("Nâng cấp từ vựng", "📖", inner);
 }
 
 function buildAdvancedStructuresHtml(structures: AdvancedStructure[]): string {
   if (structures.length === 0) return "";
-  let html = `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">🪄 Cấu trúc nâng cao gợi ý</p>`;
-  structures.forEach((s) => {
-    html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+  let inner = "";
+  structures.forEach((s, i) => {
+    inner += `<div style="padding:10px 14px;${i > 0 ? "border-top:1px solid #f1f5f9;" : ""}">
       <p style="margin:0 0 2px 0;font-size:8.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.02em;color:#0e7490;">${escapeHtml(s.structure_name)}</p>`;
     if (s.original_sentence) {
-      html += `<p style="margin:0 0 2px 0;font-size:9.5pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(s.original_sentence)}</p>`;
+      inner += `<p style="margin:0 0 2px 0;font-size:9.5pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(s.original_sentence)}</p>`;
+    } else {
+      // Khớp fallback trên web (TaskExtras) khi gợi ý không nâng cấp từ 1 câu cụ thể — bản export
+      // cũ trước đây BỎ QUA hoàn toàn dòng này, khiến giáo viên không hiểu vì sao thiếu câu gốc.
+      inner += `<p style="margin:0 0 2px 0;font-size:8.5pt;font-weight:600;font-style:italic;color:#94a3b8;">Gợi ý tổng hợp — không nâng cấp từ 1 câu cụ thể nào</p>`;
     }
-    html += `<p style="margin:0 0 2px 0;font-size:10pt;font-style:italic;color:#1e293b;white-space:pre-wrap;"><span style="background:#d1fae5;padding:0 2px;border-radius:2px;">${escapeHtml(
+    inner += `<p style="margin:0 0 2px 0;font-size:10pt;font-style:italic;color:#1e293b;white-space:pre-wrap;"><span style="background:#d1fae5;padding:0 2px;border-radius:2px;">${escapeHtml(
       s.example_sentence_en,
     )}</span></p>
       <p style="margin:0;font-size:9.5pt;color:#475569;">${escapeHtml(s.explanation_vi)}</p>
     </div>`;
   });
-  return html;
+  return cardWrapper("Cấu trúc nâng cao gợi ý", "🪄", inner);
 }
 
 function buildEssayUpgradesHtml(upgrades: EssayUpgrade[], legacyEditedEssay?: string): string {
   if (upgrades.length > 0) {
-    let html = `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">✨ Câu được viết lại hay hơn</p>`;
-    upgrades.forEach((u) => {
-      html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
-        <p style="margin:0 0 2px 0;font-size:9.5pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(u.original)}</p>
-        <p style="margin:0 0 2px 0;font-size:10pt;color:#1e293b;white-space:pre-wrap;"><span style="background:#e0f2fe;padding:0 2px;border-radius:2px;">${escapeHtml(
+    let inner = "";
+    upgrades.forEach((u, i) => {
+      inner += `<div style="padding:10px 14px;${i > 0 ? "border-top:1px solid #f1f5f9;" : ""}">
+        <p style="margin:0 0 3px 0;font-size:9.5pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(u.original)}</p>
+        <p style="margin:0 0 3px 0;font-size:10pt;color:#1e293b;white-space:pre-wrap;"><span style="background:#e0f2fe;padding:0 2px;border-radius:2px;">${escapeHtml(
           u.upgraded,
         )}</span></p>
         <p style="margin:0;font-size:9.5pt;color:#475569;">${escapeHtml(u.note)}</p>
       </div>`;
     });
-    return html;
+    return cardWrapper("Câu được viết lại hay hơn", "✨", inner);
   }
   // Fallback cho dữ liệu cũ (chấm trước khi có "essay_upgrades" dạng cấu trúc) —
   // hiện nguyên đoạn văn tự do, giống cách GradingResultPanel.tsx làm ở web.
   if (legacyEditedEssay) {
-    return `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">✨ Bài viết mẫu đã chỉnh sửa</p>
-      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;background:#f0f9ff;">
-        <p style="margin:0;font-size:10.5pt;line-height:1.5;white-space:pre-wrap;color:#1e293b;">${escapeHtml(legacyEditedEssay)}</p>
-      </div>`;
+    const inner = `<div style="padding:12px 14px;">
+      <p style="margin:0;font-size:10.5pt;line-height:1.5;white-space:pre-wrap;color:#1e293b;background:#f0f9ff;border-radius:8px;padding:10px 12px;">${escapeHtml(legacyEditedEssay)}</p>
+    </div>`;
+    return cardWrapper("Bài viết mẫu đã chỉnh sửa", "✨", inner);
   }
   return "";
 }
 
+// Khớp đúng bố cục CorrectionsSection trên web: 2 cột "Bản gốc"/"Đề xuất sửa" viền
+// trái (không tô nền màu), rồi khối giải thích nền xám nhạt có icon Bot — thay cho
+// bản cũ dùng 3 khối tô nền đỏ/xanh/xám xếp chồng, KHÔNG giống UI web.
 function buildCorrectionsHtml(corrections: Correction[]): string {
   if (corrections.length === 0) return "";
-  let html = `<h4 style="font-size:11pt;color:#0f172a;margin:0 0 7px 0;">Lỗi sai &amp; Đề xuất sửa</h4>`;
+  let html = `<div style="margin:0 0 8px 0;">
+    <span style="font-size:11pt;font-weight:900;color:#0f172a;">Lỗi sai &amp; Đề xuất sửa</span>
+    <span style="font-size:8.5pt;font-weight:bold;color:#94a3b8;margin-left:6px;">${corrections.length} lỗi</span>
+  </div>`;
   corrections.forEach((c) => {
-    html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px;margin-bottom:7px;">
-      <p style="margin:0 0 4px 0;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:5px 8px;font-size:10.5pt;color:#b91c1c;text-decoration:line-through;white-space:pre-wrap;">❌ ${escapeHtml(c.original)}</p>
-      <p style="margin:0 0 4px 0;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:5px 8px;font-size:10.5pt;font-weight:bold;color:#047857;white-space:pre-wrap;">✅ ${escapeHtml(c.corrected)}</p>
-      <p style="margin:0;background:#f8fafc;border-radius:6px;padding:5px 8px;font-size:9.5pt;color:#475569;">💡 <i>Lời khuyên:</i> ${escapeHtml(c.explanation)}</p>
+    html += `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px;">
+      <table style="width:100%;border-collapse:collapse;margin-bottom:8px;"><tr>
+        <td style="width:50%;vertical-align:top;padding:0 10px 0 10px;border-left:3px solid #fca5a5;">
+          <span style="display:block;font-size:8pt;font-weight:bold;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Bản gốc</span>
+          <p style="margin:0;font-size:10.5pt;color:#64748b;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(c.original)}</p>
+        </td>
+        <td style="width:50%;vertical-align:top;padding:0 0 0 10px;border-left:3px solid #6ee7b7;">
+          <span style="display:block;font-size:8pt;font-weight:bold;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:2px;">Đề xuất sửa</span>
+          <p style="margin:0;font-size:10.5pt;font-weight:bold;color:#334155;white-space:pre-wrap;">${escapeHtml(c.corrected)}</p>
+        </td>
+      </tr></table>
+      <table style="width:100%;border-collapse:collapse;"><tr>
+        <td style="background:#f8fafc;border-radius:8px;padding:8px 10px;font-size:9.5pt;color:#475569;line-height:1.5;">🤖 ${escapeHtml(c.explanation)}</td>
+      </tr></table>
     </div>`;
   });
   return html;
@@ -371,17 +403,54 @@ function buildTaskFeedbackHtml(
     <span style="background:#0e7490;color:#fff;font-size:11pt;font-weight:bold;padding:4px 12px;border-radius:999px;margin-left:6px;">Band ${showBand(score.band)}</span>
   </div>`;
 
-  // Bảng điểm 4 tiêu chí — cố tình làm nổi bật (nền đậm, số to) để không bị lẫn
-  // vào phần nhận xét dài phía dưới, tránh cảm giác "không thấy điểm đâu".
-  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;table-layout:fixed;">
-    <tr>${criteriaLabels.map((c) => `<td style="border:1px solid #e2e8f0;background:#f1f5f9;padding:4px 6px;font-size:8pt;font-weight:bold;color:#64748b;text-align:center;">${escapeHtml(c.label)}</td>`).join("")}</tr>
-    <tr>${criteriaLabels
-      .map(
-        (c) =>
-          `<td style="border:1px solid #e2e8f0;padding:5px 6px;font-size:13pt;font-weight:bold;color:#0e7490;text-align:center;">${showBand((score as unknown as Record<string, number>)[c.key])}</td>`,
-      )
-      .join("")}</tr>
-  </table>`;
+  // Card "Số từ / Số lỗi" — khớp card đầu tiên trên web (trước "Điểm chi tiết"),
+  // trước đây bị THIẾU hoàn toàn trong file export.
+  const wordCount = countWords(answerText);
+  html += `<table style="border-collapse:collapse;margin-bottom:8px;"><tr>
+    <td style="border:1px solid #e2e8f0;border-radius:10px;padding:8px 14px;">
+      <table style="border-collapse:collapse;"><tr>
+        <td style="vertical-align:middle;padding-right:8px;">
+          <span style="display:inline-block;background:#f1f5f9;border-radius:8px;padding:5px 7px;font-size:11pt;">📝</span>
+        </td>
+        <td style="vertical-align:middle;padding-right:${corrections.length > 0 ? "20px" : "0"};">
+          <p style="margin:0;font-size:7.5pt;font-weight:bold;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;">Số từ</p>
+          <p style="margin:0;font-size:12.5pt;font-weight:bold;color:#0f172a;">${wordCount} <span style="font-size:8.5pt;font-weight:normal;color:#94a3b8;">từ</span></p>
+        </td>
+        ${
+          corrections.length > 0
+            ? `<td style="vertical-align:middle;padding-right:8px;">
+                <span style="display:inline-block;background:#fef3c7;border-radius:8px;padding:5px 7px;font-size:11pt;">⚠️</span>
+              </td>
+              <td style="vertical-align:middle;">
+                <p style="margin:0;font-size:7.5pt;font-weight:bold;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;">Số lỗi</p>
+                <p style="margin:0;font-size:12.5pt;font-weight:bold;color:#0f172a;">${corrections.length} <span style="font-size:8.5pt;font-weight:normal;color:#94a3b8;">lỗi</span></p>
+              </td>`
+            : ""
+        }
+      </tr></table>
+    </td>
+  </tr></table>`;
+
+  // Khối "Điểm chi tiết" — khớp 100% với card trên web (GradingResultPanel.tsx):
+  // thanh tiêu đề "Điểm chi tiết" + 4 ô, mỗi ô hiện mã ngắn (TA/CC/LR/GRA) nhỏ phía
+  // trên và số điểm to phía dưới, đặt NGAY TRƯỚC phần "Phân tích 4 tiêu chí" —
+  // đúng thứ tự đã đổi trên web.
+  html += `<div style="border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:8px;">
+    <div style="background:#f8fafc;padding:8px 14px;border-bottom:1px solid #f1f5f9;">
+      <span style="font-size:10.5pt;font-weight:bold;color:#1e293b;">Điểm chi tiết</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+      <tr>${criteriaLabels
+        .map(
+          (c) =>
+            `<td style="border:1px solid #f1f5f9;padding:10px 6px;text-align:center;">
+              <div style="font-size:8pt;font-weight:bold;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8;">${escapeHtml(c.key)}</div>
+              <div style="font-size:16pt;font-weight:bold;color:#0f172a;margin-top:2px;">${showBand((score as unknown as Record<string, number>)[c.key])}</div>
+            </td>`,
+        )
+        .join("")}</tr>
+    </table>
+  </div>`;
 
   // Nhận xét: thử parse theo cấu trúc "### 1. ... / ### 2. ..." giống ExaminerSummaryCard,
   // nếu không khớp format thì hiện nguyên đoạn văn (đã in đậm ** và bỏ Band sai lệch).
@@ -397,10 +466,17 @@ function buildTaskFeedbackHtml(
     if (criteria.length > 0) {
       html += `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">Phân tích 4 tiêu chí chấm điểm</p>`;
       criteria.forEach((item) => {
-        html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px;margin-bottom:6px;">
-          <p style="margin:0 0 2px 0;font-size:10.5pt;font-weight:bold;color:#1e293b;">${criterionEmoji(item.label)} ${escapeHtml(item.label)}</p>
-          <p style="margin:0;font-size:10pt;line-height:1.5;color:#475569;">${renderInlineHtml(sanitizeBandMentions(item.content, validBands))}</p>
-        </div>`;
+        const style = criterionStyle(item.label);
+        html += `<table style="width:100%;border-collapse:collapse;margin-bottom:6px;"><tr>
+          <td style="width:4px;background:${style.accent};border-radius:8px 0 0 8px;"></td>
+          <td style="border:1px solid #e2e8f0;border-left:none;border-radius:0 8px 8px 0;padding:9px 11px;">
+            <table style="border-collapse:collapse;margin-bottom:4px;"><tr>
+              <td style="vertical-align:middle;padding-right:6px;"><span style="display:inline-block;background:${style.bg};border-radius:6px;padding:2px 5px;font-size:9pt;">${style.emoji}</span></td>
+              <td style="vertical-align:middle;"><span style="font-size:10.5pt;font-weight:bold;color:#1e293b;">${escapeHtml(item.label)}</span></td>
+            </tr></table>
+            <p style="margin:0;font-size:10pt;line-height:1.5;color:#475569;">${renderInlineHtml(sanitizeBandMentions(item.content, validBands))}</p>
+          </td>
+        </tr></table>`;
       });
     }
     if (diagnosis.length > 0) {
