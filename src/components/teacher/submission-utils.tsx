@@ -100,16 +100,16 @@ function getHighlightOriginalText(item: HighlightItem): string | undefined {
 }
 
 const HIGHLIGHT_KIND_STYLE: Record<HighlightItem["kind"], string> = {
-  correction: "bg-amber-200/70 decoration-amber-500 hover:bg-amber-300/80",
-  upgrade: "bg-sky-200/70 decoration-sky-500 hover:bg-sky-300/80",
-  structure: "bg-emerald-200/70 decoration-emerald-500 hover:bg-emerald-300/80",
+  correction: "bg-amber-100/60 decoration-amber-400 hover:bg-amber-200/80",
+  upgrade: "bg-sky-100/60 decoration-sky-400 hover:bg-sky-200/80",
+  structure: "bg-emerald-100/60 decoration-emerald-400 hover:bg-emerald-200/80",
 };
 
 // Khi 1 vùng text được từ 2+ loại cùng trỏ tới (chồng lấn nhau) — vd một câu
 // vừa là gợi ý nâng cấp cấu trúc, vừa là câu viết lại hay hơn — dùng màu tím
 // riêng để báo hiệu "ở đây có nhiều phản hồi", thay vì chỉ hiện 1 loại và
 // âm thầm giấu mất (những) loại còn lại.
-const MIXED_HIGHLIGHT_STYLE = "bg-violet-200/70 decoration-violet-500 hover:bg-violet-300/80";
+const MIXED_HIGHLIGHT_STYLE = "bg-violet-100/60 decoration-violet-400 hover:bg-violet-200/80";
 
 // Thứ tự ưu tiên khi cần chọn MỘT nhãn đại diện hiển thị cho cụm (chỉ dùng để
 // đặt tooltip, không dùng để loại bỏ item nào — mọi item trong cụm đều được

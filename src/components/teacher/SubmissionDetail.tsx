@@ -162,11 +162,11 @@ export default function SubmissionDetail({
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 mb-2">Gợi ý:</p>
-            <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-sm text-red-700 leading-relaxed line-through decoration-red-300/60 whitespace-pre-wrap">
+            <div className="border-l-[3px] border-red-300 pl-3 py-1 text-sm text-slate-500 leading-relaxed line-through decoration-slate-300 whitespace-pre-wrap">
               {c.original}
             </div>
             <div className="flex justify-center py-1 text-slate-300">↓</div>
-            <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed whitespace-pre-wrap">
+            <div className="border-l-[3px] border-emerald-300 pl-3 py-1 text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
               {c.corrected}
             </div>
           </div>
@@ -190,11 +190,11 @@ export default function SubmissionDetail({
           </div>
           <div>
             <p className="text-xs font-bold text-slate-500 mb-2">Nâng cấp:</p>
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+            <div className="border-l-[3px] border-slate-300 pl-3 py-1 text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">
               {u.original}
             </div>
             <div className="flex justify-center py-1 text-slate-300">↓</div>
-            <div className="rounded-xl bg-sky-50 border border-sky-100 p-3 text-sm text-sky-800 font-medium leading-relaxed whitespace-pre-wrap">
+            <div className="border-l-[3px] border-sky-300 pl-3 py-1 text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-wrap">
               {u.upgraded}
             </div>
           </div>
@@ -214,13 +214,13 @@ export default function SubmissionDetail({
         {s.original_sentence && (
           <div>
             <p className="text-xs font-bold text-slate-500 mb-2">Câu gốc → Áp dụng cấu trúc:</p>
-            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+            <div className="border-l-[3px] border-slate-300 pl-3 py-1 text-sm text-slate-500 leading-relaxed whitespace-pre-wrap">
               {s.original_sentence}
             </div>
             <div className="flex justify-center py-1 text-slate-300">↓</div>
           </div>
         )}
-        <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 text-sm text-emerald-800 font-medium leading-relaxed italic whitespace-pre-wrap">
+        <div className="border-l-[3px] border-emerald-300 pl-3 py-1 text-sm text-slate-700 font-medium leading-relaxed italic whitespace-pre-wrap">
           {s.example_sentence_en}
         </div>
         <div>
@@ -439,7 +439,7 @@ export default function SubmissionDetail({
 
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
-                            <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-4 sm:px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px] max-w-[70ch] mx-auto">
+                            <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-4 sm:px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
                               {parsedContent.task1Answer ? (
                                 renderHighlightedAnswer(
                                   parsedContent.task1Answer,
@@ -503,7 +503,7 @@ export default function SubmissionDetail({
 
                           <div>
                             <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Bài làm học sinh</p>
-                            <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-4 sm:px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px] max-w-[70ch] mx-auto">
+                            <div className="whitespace-pre-wrap font-serif text-[15px] leading-[2] bg-[#fcfcfc] border border-slate-200 rounded-xl px-4 sm:px-6 py-6 text-slate-800 tracking-wide selection:bg-cyan-200 min-h-[120px]">
                               {parsedContent.task2Answer ? (
                                 renderHighlightedAnswer(
                                   parsedContent.task2Answer,

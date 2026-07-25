@@ -105,6 +105,69 @@ export function formatBandScore(score: unknown): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+// Danh sách "Lỗi sai & Đề xuất sửa" — mặc định THU GỌN, chỉ hiện số lượng lỗi
+// theo từng tiêu chí (TA/CC/LR/GRA) để quét nhanh bằng mắt; bấm vào mới xổ ra
+// từng lỗi chi tiết. Tránh việc phải cuộn qua 8-15 card ngay khi vừa mở bài.
+function CorrectionsSection({ corrections }: { corrections: Correction[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (corrections.length === 0) return null;
+
+  const counts: Record<string, number> = {};
+  for (const c of corrections) {
+    const key = (c as any).criterion || "Khác";
+    counts[key] = (counts[key] ?? 0) + 1;
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-white border border-slate-200/80 px-5 py-4 text-left hover:border-slate-300 transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <h4 className="font-black text-slate-900 text-base">Lỗi sai & Đề xuất sửa</h4>
+          <span className="text-xs font-bold text-slate-400">{corrections.length} lỗi</span>
+        </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <div className="hidden sm:flex items-center gap-1.5">
+            {Object.entries(counts).map(([key, n]) => (
+              <span key={key} className="text-[11px] font-bold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">
+                {key} · {n}
+              </span>
+            ))}
+          </div>
+          <span className="text-xs font-bold text-cyan-700">{expanded ? "Thu gọn" : "Xem chi tiết"}</span>
+          <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="space-y-4 mt-4">
+          {corrections.map((correction, index) => (
+            <div key={index} className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="border-l-[3px] border-red-300 pl-3 py-0.5">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Bản gốc</span>
+                  <p className="text-[14px] text-slate-500 line-through decoration-slate-300 whitespace-pre-wrap">{correction.original}</p>
+                </div>
+                <div className="border-l-[3px] border-emerald-300 pl-3 py-0.5">
+                  <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Đề xuất sửa</span>
+                  <p className="text-[14px] text-slate-700 font-medium whitespace-pre-wrap">{correction.corrected}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
+                <Bot className="h-5 w-5 shrink-0 text-cyan-600 mt-0.5" />
+                <p className="text-sm text-slate-600 leading-relaxed font-medium">{correction.explanation}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type TaskExtrasProps = {
   goldenRule?: string;
   bandProgression?: BandProgression;
@@ -130,8 +193,8 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
   return (
     <div className="space-y-5">
       {goldenRule && (
-        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
-          <div className="shrink-0 bg-amber-100 p-1.5 rounded-lg"><Lightbulb className="h-4 w-4 text-amber-600" /></div>
+        <div className="flex items-start gap-3 rounded-xl border-l-[3px] border-amber-300 bg-white p-4">
+          <div className="shrink-0 bg-amber-50 p-1.5 rounded-lg"><Lightbulb className="h-4 w-4 text-amber-500" /></div>
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 mb-0.5">Nguyên tắc vàng</p>
             <p className="text-sm text-slate-700 font-medium leading-relaxed">{goldenRule}</p>
@@ -199,7 +262,7 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
                   <p className="text-[11px] font-semibold text-slate-400 italic">Gợi ý tổng hợp — không nâng cấp từ 1 câu cụ thể nào</p>
                 )}
                 <p className="text-sm text-slate-800 italic">
-                  <mark className="bg-emerald-200/70 text-slate-900 rounded-sm px-0.5">{s.example_sentence_en}</mark>
+                  <mark className="bg-emerald-100/70 text-slate-900 rounded-sm px-0.5">{s.example_sentence_en}</mark>
                 </p>
                 <p className="text-sm text-slate-500">{s.explanation_vi}</p>
               </div>
@@ -219,7 +282,7 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
               <div key={i} className="p-4 space-y-1.5">
                 <p className="text-sm text-slate-500 line-through decoration-slate-300">{u.original}</p>
                 <p className="text-sm text-slate-800">
-                  <mark className="bg-sky-200/70 text-slate-900 rounded-sm px-0.5">{u.upgraded}</mark>
+                  <mark className="bg-sky-100/70 text-slate-900 rounded-sm px-0.5">{u.upgraded}</mark>
                 </p>
                 <p className="text-sm text-slate-500">{u.note}</p>
               </div>
@@ -239,7 +302,7 @@ function TaskExtras({ goldenRule, bandProgression, vocabulary, advancedStructure
           </button>
           {showLegacyEssay && (
             <div className="p-5">
-              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-sky-100/70 rounded-lg px-3 py-2.5 box-decoration-clone">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap bg-sky-50 rounded-lg px-3 py-2.5 box-decoration-clone">
                 {legacyEditedEssay}
               </p>
             </div>
@@ -340,31 +403,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
               </div>
             </div>
 
-            {task1Corrections.length > 0 && (
-              <div>
-                <h4 className="font-black text-slate-900 mb-4 text-lg">Lỗi sai & Đề xuất sửa</h4>
-                <div className="space-y-4">
-                  {task1Corrections.map((correction, index) => (
-                    <div key={index} className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
-                          <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
-                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50 whitespace-pre-wrap">{correction.original}</p>
-                        </div>
-                        <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
-                          <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
-                          <p className="text-[14px] text-emerald-800 font-medium whitespace-pre-wrap">{correction.corrected}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
-                        <Bot className="h-5 w-5 shrink-0 text-cyan-600 mt-0.5" />
-                        <p className="text-sm text-slate-600 leading-relaxed font-medium">{correction.explanation}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <CorrectionsSection corrections={task1Corrections} />
 
             <TaskExtras
               goldenRule={resolveTaskGoldenRule(feedback, "task1")}
@@ -445,31 +484,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
               </div>
             </div>
 
-            {task2Corrections.length > 0 && (
-              <div>
-                <h4 className="font-black text-slate-900 mb-4 text-lg">Lỗi sai & Đề xuất sửa</h4>
-                <div className="space-y-4">
-                  {task2Corrections.map((correction, index) => (
-                    <div key={index} className="rounded-2xl bg-white border border-slate-200/80 p-5 shadow-sm space-y-3">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="rounded-xl bg-red-50/50 border border-red-100 p-3">
-                          <span className="block text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">Bản gốc</span>
-                          <p className="text-[14px] text-red-700 line-through decoration-red-300/50 whitespace-pre-wrap">{correction.original}</p>
-                        </div>
-                        <div className="rounded-xl bg-emerald-50/50 border border-emerald-100 p-3">
-                          <span className="block text-[10px] font-bold text-emerald-500 uppercase tracking-wider mb-1">Đề xuất sửa</span>
-                          <p className="text-[14px] text-emerald-800 font-medium whitespace-pre-wrap">{correction.corrected}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2.5 rounded-xl bg-slate-50 p-3">
-                        <Bot className="h-5 w-5 shrink-0 text-cyan-600 mt-0.5" />
-                        <p className="text-sm text-slate-600 leading-relaxed font-medium">{correction.explanation}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <CorrectionsSection corrections={task2Corrections} />
 
             <TaskExtras
               goldenRule={resolveTaskGoldenRule(feedback, "task2")}
