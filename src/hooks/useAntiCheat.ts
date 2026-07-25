@@ -165,9 +165,13 @@ export function useAntiCheat({
       }
     };
 
-    // Ép hệ thống cho phép Copy/Paste (Stop propagation của các hàm chặn khác nếu có)
-    const forceAllowEvent = (e: Event) => {
-      e.stopPropagation();
+    // Chỉ dùng để đánh dấu "bypass" cảnh báo rời-tab/blur giả khi người dùng
+    // bấm chuột phải hoặc giữ Ctrl/Cmd (mở context menu, thao tác copy...).
+    // KHÔNG được gọi e.stopPropagation() ở đây: làm vậy sẽ chặn đứng sự kiện
+    // copy/paste/contextmenu lan tới listener chặn clipboard ở StudentTest.tsx
+    // (gắn trên document, cũng capture phase) — vô hiệu hóa tính năng
+    // "Chặn copy/paste" của giáo viên dù đã bật hay chưa.
+    const forceAllowEvent = () => {
       triggerBypass();
     };
 
@@ -183,7 +187,8 @@ export function useAntiCheat({
     window.addEventListener("mousedown", handleEarlyInteraction);
     window.addEventListener("keydown", handleEarlyInteraction);
 
-    // Gắn capture phase để ghi đè mọi hàm block copy/paste ở cấp window
+    // Gắn capture phase chỉ để phát hiện sớm thao tác copy/paste/chuột phải và
+    // đánh dấu bypass cảnh báo blur giả — KHÔNG ghi đè tính năng chặn copy/paste
     window.addEventListener("contextmenu", forceAllowEvent, { capture: true });
     window.addEventListener("copy", forceAllowEvent, { capture: true });
     window.addEventListener("paste", forceAllowEvent, { capture: true });
