@@ -19,6 +19,7 @@ export type TestRow = {
   image_url: string | null;
   duration_minutes: number;
   class_id: string | null;
+  block_copy_paste: boolean;
   created_at: string;
   // Chỉ có khi query join sang bảng classes (select("*, classes(name)"))
   classes?: { name: string } | null;

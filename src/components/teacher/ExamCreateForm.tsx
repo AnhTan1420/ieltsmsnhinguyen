@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, BookOpen, Check, Clock, Copy, Edit3, GraduationCap, Image as ImageIcon, Loader2, Plus, Trash2, UploadCloud } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, Clock, ClipboardX, Copy, Edit3, GraduationCap, Image as ImageIcon, Loader2, Plus, Trash2, UploadCloud } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import type { TestRow } from "@/lib/types";
 import { useTests } from "@/hooks/teacher/useTests";
@@ -67,6 +67,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
       image_url: editingTest.image_url || null,
       duration_minutes: editingTest.duration_minutes && editingTest.duration_minutes > 0 ? editingTest.duration_minutes : 60,
       class_id: editingTest.class_id || null,
+      block_copy_paste: editingTest.block_copy_paste ?? false,
     };
 
     let responseError = null;
@@ -102,7 +103,7 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
             <p className="text-sm text-slate-500 font-medium mt-1">Danh sách các đề IELTS Writing bạn đã tạo</p>
           </div>
           <button
-            onClick={() => setEditingTest({ title: "", task1_prompt: "", task2_prompt: "", image_url: null, duration_minutes: 60 })}
+            onClick={() => setEditingTest({ title: "", task1_prompt: "", task2_prompt: "", image_url: null, duration_minutes: 60, block_copy_paste: false })}
             className="flex shrink-0 items-center gap-2 rounded-xl bg-slate-900 px-4 sm:px-5 py-2.5 text-sm font-bold text-white hover:bg-slate-800 shadow-sm transition-all hover:shadow-md"
           >
             <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Soạn đề mới</span>
@@ -226,6 +227,23 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
                 <p className="text-xs text-slate-400 mt-1.5">Chưa có lớp học nào. Tạo lớp ở tab "Quản lý lớp học" trước.</p>
               )}
             </div>
+
+            <label className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-slate-50 p-4 cursor-pointer hover:border-cyan-300 transition-colors">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500/40"
+                checked={editingTest.block_copy_paste ?? false}
+                onChange={(e) => setEditingTest({ ...editingTest, block_copy_paste: e.target.checked })}
+              />
+              <span>
+                <span className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                  <ClipboardX className="h-4 w-4 text-cyan-600" /> Chặn copy/paste
+                </span>
+                <span className="block text-xs text-slate-400 mt-1">
+                  Khi bật, học sinh sẽ không thể sao chép/dán nội dung ở trang làm bài. Khi tắt, học sinh copy/paste bình thường.
+                </span>
+              </span>
+            </label>
 
             <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-4 shadow-sm">
               <div className="flex items-center gap-2 font-black text-slate-800 text-base">

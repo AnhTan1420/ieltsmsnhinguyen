@@ -20,6 +20,7 @@ export interface StudentTestProps {
   task2Prompt: string | null;
   imageUrl: string | null;
   durationMinutes: number;
+  blockCopyPaste?: boolean;
 }
 
 type Step = "setup" | "testing" | "submitted" | "disqualified";
@@ -35,6 +36,7 @@ export default function StudentTest({
   task2Prompt,
   imageUrl,
   durationMinutes,
+  blockCopyPaste = false,
 }: StudentTestProps) {
   const [step, setStep] = useState<Step>("setup");
   const [studentName, setStudentName] = useState("");
@@ -103,6 +105,29 @@ export default function StudentTest({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isImageZoomed]);
+
+  // Tính năng "Chặn copy/paste" — giáo viên bật/tắt theo từng đề thi trong panel
+  // "Chỉnh sửa Đề thi". Khi bật, học sinh không thể copy/paste/cut trong lúc làm
+  // bài (step "testing"); chỉ ngăn hành vi mặc định của trình duyệt, không chặn
+  // gõ phím bình thường. Tắt cờ này thì không gắn listener nào -> copy/paste
+  // hoạt động bình thường như cũ.
+  useEffect(() => {
+    if (!blockCopyPaste || step !== "testing") return;
+
+    const preventClipboardAction = (e: ClipboardEvent) => {
+      e.preventDefault();
+    };
+
+    document.addEventListener("copy", preventClipboardAction);
+    document.addEventListener("paste", preventClipboardAction);
+    document.addEventListener("cut", preventClipboardAction);
+
+    return () => {
+      document.removeEventListener("copy", preventClipboardAction);
+      document.removeEventListener("paste", preventClipboardAction);
+      document.removeEventListener("cut", preventClipboardAction);
+    };
+  }, [blockCopyPaste, step]);
 
   const buildCombinedContent = useCallback(
     (t1: string, t2: string) =>

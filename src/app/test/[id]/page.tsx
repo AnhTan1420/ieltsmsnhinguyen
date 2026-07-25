@@ -26,7 +26,7 @@ export default async function TestPage({ params }: { params: Promise<{ id: strin
   // 2. Lấy dữ liệu thực tế (Title, Task 1, Task 2, Ảnh) từ Database
   const { data: test, error } = await supabase
     .from("tests")
-    .select("id, title, task1_prompt, task2_prompt, image_url, duration_minutes")
+    .select("id, title, task1_prompt, task2_prompt, image_url, duration_minutes, block_copy_paste")
     .eq("id", id)
     .single();
 
@@ -52,6 +52,7 @@ export default async function TestPage({ params }: { params: Promise<{ id: strin
       task2Prompt={test.task2_prompt}
       imageUrl={test.image_url}
       durationMinutes={test.duration_minutes ?? 60}
+      blockCopyPaste={test.block_copy_paste ?? false}
     />
   );
 }
