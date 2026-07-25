@@ -21,6 +21,14 @@ import { sanitizeBandMentions } from "@/components/teacher/band-sanitizer";
 // cho Times New Roman cũ, vốn nhỏ và khó đọc hơn khi xem trên màn hình.
 const DOC_FONT = "Calibri, 'Segoe UI', Arial, sans-serif";
 
+// formatBandScore() trả về "" khi điểm bị thiếu (undefined/null/NaN) — trong file .doc,
+// 1 ô trống trắng xóa trông giống lỗi "mất điểm" hơn là "chưa có dữ liệu". Bọc thêm dấu
+// gạch ngang để giáo viên luôn thấy RÕ RÀNG có ô điểm ở đó, chỉ là chưa có giá trị.
+function showBand(score: unknown): string {
+  const formatted = formatBandScore(score);
+  return formatted.trim() ? formatted : "—";
+}
+
 // ---- Các hàm hỗ trợ xuất file DOC, đảm bảo nội dung file tải về khớp với UI trên web ----
 
 /**
@@ -174,11 +182,11 @@ function buildTaskSectionsHtml(
 ) {
   let html = "";
 
-  html += `<h3 style="font-size:15pt;color:#0f172a;border-left:5px solid #06b6d4;padding-left:12px;margin:0 0 12px 0;">TASK 1</h3>`;
+  html += `<h3 style="font-size:12.5pt;color:#0f172a;border-left:4px solid #06b6d4;padding-left:9px;margin:0 0 8px 0;">TASK 1</h3>`;
   if (sections.task1Prompt) {
-    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-      <p style="margin:0 0 4px 0;font-size:10.5pt;font-weight:bold;color:#64748b;letter-spacing:0.03em;text-transform:uppercase;">Đề bài</p>
-      <p style="margin:0;white-space:pre-wrap;font-size:12.5pt;line-height:1.6;">${escapeHtml(sections.task1Prompt)}</p>
+    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+      <p style="margin:0 0 3px 0;font-size:8.5pt;font-weight:bold;color:#64748b;letter-spacing:0.03em;text-transform:uppercase;">Đề bài</p>
+      <p style="margin:0;white-space:pre-wrap;font-size:10.5pt;line-height:1.45;">${escapeHtml(sections.task1Prompt)}</p>
     </div>`;
   }
   if (sections.task1ImageUrl) {
@@ -186,28 +194,28 @@ function buildTaskSectionsHtml(
     const heightAttr = sections.task1ImageHeight ? ` height="${sections.task1ImageHeight}"` : "";
     // Nếu đã có width/height cụ thể (đo từ ảnh thật) thì không cần max-width/max-height CSS nữa —
     // Word không tin cậy CSS khi convert .doc nên ưu tiên thuộc tính HTML width/height.
-    const sizeStyle = sections.task1ImageWidth ? "" : "max-width:500px;max-height:350px;";
-    html += `<div style="text-align:center;margin-bottom:12px;">
-      <img src="${sections.task1ImageUrl}"${widthAttr}${heightAttr} style="${sizeStyle}border:1px solid #e2e8f0;border-radius:10px;" />
+    const sizeStyle = sections.task1ImageWidth ? "" : "max-width:440px;max-height:300px;";
+    html += `<div style="text-align:center;margin-bottom:8px;">
+      <img src="${sections.task1ImageUrl}"${widthAttr}${heightAttr} style="${sizeStyle}border:1px solid #e2e8f0;border-radius:8px;" />
     </div>`;
   }
-  html += `<div style="margin-bottom:20px;">
-    <p style="margin:0 0 6px 0;font-size:10.5pt;font-weight:bold;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">Bài làm học sinh</p>
-    <div style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:12.5pt;line-height:1.65;background:#fcfcfc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;color:#1e293b;">${
+  html += `<div style="margin-bottom:14px;">
+    <p style="margin:0 0 4px 0;font-size:8.5pt;font-weight:bold;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">Bài làm học sinh</p>
+    <div style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.5;background:#fcfcfc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;color:#1e293b;">${
       sections.task1Answer ? highlightAnswerHtml(sections.task1Answer, task1Corrections) : "<i>Học sinh chưa làm Task 1</i>"
     }</div>
   </div>`;
 
-  html += `<h3 style="font-size:15pt;color:#0f172a;border-left:5px solid #06b6d4;padding-left:12px;margin:0 0 12px 0;">TASK 2</h3>`;
+  html += `<h3 style="font-size:12.5pt;color:#0f172a;border-left:4px solid #06b6d4;padding-left:9px;margin:0 0 8px 0;">TASK 2</h3>`;
   if (sections.task2Prompt) {
-    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
-      <p style="margin:0 0 4px 0;font-size:10.5pt;font-weight:bold;color:#64748b;letter-spacing:0.03em;text-transform:uppercase;">Đề bài</p>
-      <p style="margin:0;white-space:pre-wrap;font-size:12.5pt;line-height:1.6;">${escapeHtml(sections.task2Prompt)}</p>
+    html += `<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+      <p style="margin:0 0 3px 0;font-size:8.5pt;font-weight:bold;color:#64748b;letter-spacing:0.03em;text-transform:uppercase;">Đề bài</p>
+      <p style="margin:0;white-space:pre-wrap;font-size:10.5pt;line-height:1.45;">${escapeHtml(sections.task2Prompt)}</p>
     </div>`;
   }
-  html += `<div style="margin-bottom:20px;">
-    <p style="margin:0 0 6px 0;font-size:10.5pt;font-weight:bold;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">Bài làm học sinh</p>
-    <div style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:12.5pt;line-height:1.65;background:#fcfcfc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;color:#1e293b;">${
+  html += `<div style="margin-bottom:14px;">
+    <p style="margin:0 0 4px 0;font-size:8.5pt;font-weight:bold;color:#94a3b8;letter-spacing:0.05em;text-transform:uppercase;">Bài làm học sinh</p>
+    <div style="white-space:pre-wrap;font-family:Georgia,'Times New Roman',serif;font-size:10.5pt;line-height:1.5;background:#fcfcfc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;color:#1e293b;">${
       sections.task2Answer ? highlightAnswerHtml(sections.task2Answer, task2Corrections) : "<i>Học sinh chưa làm Task 2</i>"
     }</div>
   </div>`;
@@ -239,23 +247,23 @@ function renderInlineHtml(text: string): string {
 
 function buildGoldenRuleHtml(goldenRule?: string): string {
   if (!goldenRule) return "";
-  return `<div style="border-left:4px solid #fbbf24;background:#fff;border:1px solid #fef3c7;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
-    <p style="margin:0 0 4px 0;font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#b45309;">💡 Nguyên tắc vàng</p>
-    <p style="margin:0;font-size:12pt;line-height:1.6;color:#334155;">${escapeHtml(goldenRule)}</p>
+  return `<div style="border-left:3px solid #fbbf24;background:#fff;border:1px solid #fef3c7;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+    <p style="margin:0 0 3px 0;font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#b45309;">💡 Nguyên tắc vàng</p>
+    <p style="margin:0;font-size:10.5pt;line-height:1.5;color:#334155;">${escapeHtml(goldenRule)}</p>
   </div>`;
 }
 
 function buildBandProgressionHtml(bp?: BandProgression): string {
   if (!bp) return "";
-  let html = `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
-    <p style="margin:0 0 8px 0;font-size:12pt;font-weight:bold;color:#0f172a;">🧭 Lộ trình lên band</p>
-    <p style="margin:0 0 5px 0;font-size:11.5pt;line-height:1.6;color:#334155;"><strong>Vì sao đang ở band này:</strong> ${escapeHtml(bp.why_current)}</p>
-    <p style="margin:0 0 5px 0;font-size:11.5pt;line-height:1.6;color:#334155;"><strong>Vì sao chưa thấp hơn:</strong> ${escapeHtml(bp.why_not_lower)}</p>
-    <p style="margin:0 0 5px 0;font-size:11.5pt;line-height:1.6;color:#334155;"><strong>Vì sao chưa cao hơn:</strong> ${escapeHtml(bp.why_not_higher)}</p>`;
+  let html = `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+    <p style="margin:0 0 6px 0;font-size:10.5pt;font-weight:bold;color:#0f172a;">🧭 Lộ trình lên band</p>
+    <p style="margin:0 0 4px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong>Vì sao đang ở band này:</strong> ${escapeHtml(bp.why_current)}</p>
+    <p style="margin:0 0 4px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong>Vì sao chưa thấp hơn:</strong> ${escapeHtml(bp.why_not_lower)}</p>
+    <p style="margin:0 0 4px 0;font-size:10pt;line-height:1.5;color:#334155;"><strong>Vì sao chưa cao hơn:</strong> ${escapeHtml(bp.why_not_higher)}</p>`;
   if (bp.roadmap_steps?.length > 0) {
-    html += `<p style="margin:8px 0 4px 0;font-size:11.5pt;font-weight:bold;color:#1e293b;">Việc cần làm tiếp theo:</p><ol style="margin:0;padding-left:20px;">`;
+    html += `<p style="margin:6px 0 3px 0;font-size:10pt;font-weight:bold;color:#1e293b;">Việc cần làm tiếp theo:</p><ol style="margin:0;padding-left:18px;">`;
     bp.roadmap_steps.forEach((step) => {
-      html += `<li style="font-size:11.5pt;line-height:1.6;color:#475569;margin-bottom:3px;">${escapeHtml(step)}</li>`;
+      html += `<li style="font-size:10pt;line-height:1.5;color:#475569;margin-bottom:2px;">${escapeHtml(step)}</li>`;
     });
     html += `</ol>`;
   }
@@ -265,13 +273,13 @@ function buildBandProgressionHtml(bp?: BandProgression): string {
 
 function buildVocabularyHtml(vocab: VocabularySuggestion[]): string {
   if (vocab.length === 0) return "";
-  let html = `<p style="font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px 0;">📖 Nâng cấp từ vựng</p>`;
-  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">`;
+  let html = `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">📖 Nâng cấp từ vựng</p>`;
+  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;">`;
   vocab.forEach((v) => {
     html += `<tr>
-      <td style="border:1px solid #e2e8f0;padding:6px 10px;font-size:11pt;color:#b91c1c;text-decoration:line-through;">${escapeHtml(v.original_word)}</td>
-      <td style="border:1px solid #e2e8f0;padding:6px 10px;font-size:11pt;font-weight:bold;color:#047857;">${escapeHtml(v.better_alternative)}</td>
-      <td style="border:1px solid #e2e8f0;padding:6px 10px;font-size:11pt;color:#475569;">${escapeHtml(v.reason)}</td>
+      <td style="border:1px solid #e2e8f0;padding:5px 8px;font-size:9.5pt;color:#b91c1c;text-decoration:line-through;">${escapeHtml(v.original_word)}</td>
+      <td style="border:1px solid #e2e8f0;padding:5px 8px;font-size:9.5pt;font-weight:bold;color:#047857;">${escapeHtml(v.better_alternative)}</td>
+      <td style="border:1px solid #e2e8f0;padding:5px 8px;font-size:9.5pt;color:#475569;">${escapeHtml(v.reason)}</td>
     </tr>`;
   });
   html += `</table>`;
@@ -280,17 +288,17 @@ function buildVocabularyHtml(vocab: VocabularySuggestion[]): string {
 
 function buildAdvancedStructuresHtml(structures: AdvancedStructure[]): string {
   if (structures.length === 0) return "";
-  let html = `<p style="font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px 0;">🪄 Cấu trúc nâng cao gợi ý</p>`;
+  let html = `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">🪄 Cấu trúc nâng cao gợi ý</p>`;
   structures.forEach((s) => {
-    html += `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-      <p style="margin:0 0 3px 0;font-size:10.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.02em;color:#0e7490;">${escapeHtml(s.structure_name)}</p>`;
+    html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+      <p style="margin:0 0 2px 0;font-size:8.5pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.02em;color:#0e7490;">${escapeHtml(s.structure_name)}</p>`;
     if (s.original_sentence) {
-      html += `<p style="margin:0 0 3px 0;font-size:11pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(s.original_sentence)}</p>`;
+      html += `<p style="margin:0 0 2px 0;font-size:9.5pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(s.original_sentence)}</p>`;
     }
-    html += `<p style="margin:0 0 3px 0;font-size:11.5pt;font-style:italic;color:#1e293b;white-space:pre-wrap;"><span style="background:#d1fae5;padding:0 2px;border-radius:2px;">${escapeHtml(
+    html += `<p style="margin:0 0 2px 0;font-size:10pt;font-style:italic;color:#1e293b;white-space:pre-wrap;"><span style="background:#d1fae5;padding:0 2px;border-radius:2px;">${escapeHtml(
       s.example_sentence_en,
     )}</span></p>
-      <p style="margin:0;font-size:11pt;color:#475569;">${escapeHtml(s.explanation_vi)}</p>
+      <p style="margin:0;font-size:9.5pt;color:#475569;">${escapeHtml(s.explanation_vi)}</p>
     </div>`;
   });
   return html;
@@ -298,14 +306,14 @@ function buildAdvancedStructuresHtml(structures: AdvancedStructure[]): string {
 
 function buildEssayUpgradesHtml(upgrades: EssayUpgrade[], legacyEditedEssay?: string): string {
   if (upgrades.length > 0) {
-    let html = `<p style="font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px 0;">✨ Câu được viết lại hay hơn</p>`;
+    let html = `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">✨ Câu được viết lại hay hơn</p>`;
     upgrades.forEach((u) => {
-      html += `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-        <p style="margin:0 0 3px 0;font-size:11pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(u.original)}</p>
-        <p style="margin:0 0 3px 0;font-size:11.5pt;color:#1e293b;white-space:pre-wrap;"><span style="background:#e0f2fe;padding:0 2px;border-radius:2px;">${escapeHtml(
+      html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:6px;">
+        <p style="margin:0 0 2px 0;font-size:9.5pt;color:#94a3b8;text-decoration:line-through;white-space:pre-wrap;">${escapeHtml(u.original)}</p>
+        <p style="margin:0 0 2px 0;font-size:10pt;color:#1e293b;white-space:pre-wrap;"><span style="background:#e0f2fe;padding:0 2px;border-radius:2px;">${escapeHtml(
           u.upgraded,
         )}</span></p>
-        <p style="margin:0;font-size:11pt;color:#475569;">${escapeHtml(u.note)}</p>
+        <p style="margin:0;font-size:9.5pt;color:#475569;">${escapeHtml(u.note)}</p>
       </div>`;
     });
     return html;
@@ -313,9 +321,9 @@ function buildEssayUpgradesHtml(upgrades: EssayUpgrade[], legacyEditedEssay?: st
   // Fallback cho dữ liệu cũ (chấm trước khi có "essay_upgrades" dạng cấu trúc) —
   // hiện nguyên đoạn văn tự do, giống cách GradingResultPanel.tsx làm ở web.
   if (legacyEditedEssay) {
-    return `<p style="font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px 0;">✨ Bài viết mẫu đã chỉnh sửa</p>
-      <div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:12px;background:#f0f9ff;">
-        <p style="margin:0;font-size:12pt;line-height:1.6;white-space:pre-wrap;color:#1e293b;">${escapeHtml(legacyEditedEssay)}</p>
+    return `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">✨ Bài viết mẫu đã chỉnh sửa</p>
+      <div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:8px;background:#f0f9ff;">
+        <p style="margin:0;font-size:10.5pt;line-height:1.5;white-space:pre-wrap;color:#1e293b;">${escapeHtml(legacyEditedEssay)}</p>
       </div>`;
   }
   return "";
@@ -323,12 +331,12 @@ function buildEssayUpgradesHtml(upgrades: EssayUpgrade[], legacyEditedEssay?: st
 
 function buildCorrectionsHtml(corrections: Correction[]): string {
   if (corrections.length === 0) return "";
-  let html = `<h4 style="font-size:13pt;color:#0f172a;margin:0 0 10px 0;">Lỗi sai &amp; Đề xuất sửa</h4>`;
+  let html = `<h4 style="font-size:11pt;color:#0f172a;margin:0 0 7px 0;">Lỗi sai &amp; Đề xuất sửa</h4>`;
   corrections.forEach((c) => {
-    html += `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px;">
-      <p style="margin:0 0 6px 0;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:7px 10px;font-size:12pt;color:#b91c1c;text-decoration:line-through;white-space:pre-wrap;">❌ ${escapeHtml(c.original)}</p>
-      <p style="margin:0 0 6px 0;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:7px 10px;font-size:12pt;font-weight:bold;color:#047857;white-space:pre-wrap;">✅ ${escapeHtml(c.corrected)}</p>
-      <p style="margin:0;background:#f8fafc;border-radius:8px;padding:7px 10px;font-size:11.5pt;color:#475569;">💡 <i>Lời khuyên:</i> ${escapeHtml(c.explanation)}</p>
+    html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:9px;margin-bottom:7px;">
+      <p style="margin:0 0 4px 0;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:5px 8px;font-size:10.5pt;color:#b91c1c;text-decoration:line-through;white-space:pre-wrap;">❌ ${escapeHtml(c.original)}</p>
+      <p style="margin:0 0 4px 0;background:#ecfdf5;border:1px solid #a7f3d0;border-radius:6px;padding:5px 8px;font-size:10.5pt;font-weight:bold;color:#047857;white-space:pre-wrap;">✅ ${escapeHtml(c.corrected)}</p>
+      <p style="margin:0;background:#f8fafc;border-radius:6px;padding:5px 8px;font-size:9.5pt;color:#475569;">💡 <i>Lời khuyên:</i> ${escapeHtml(c.explanation)}</p>
     </div>`;
   });
   return html;
@@ -353,20 +361,23 @@ function buildTaskFeedbackHtml(
     .map((c) => (score as unknown as Record<string, number>)[c.key])
     .filter((n): n is number => typeof n === "number");
 
-  let html = `<div style="margin-bottom:24px;">`;
-  html += `<div style="margin-bottom:12px;">
-    <span style="background:#0f172a;color:#fff;font-size:10.5pt;font-weight:bold;letter-spacing:0.04em;padding:6px 12px;border-radius:8px;">${taskLabel}</span>
-    <span style="background:#cffafe;color:#0e7490;font-size:10.5pt;font-weight:bold;padding:6px 12px;border-radius:999px;margin-left:8px;">Band ${formatBandScore(score.band)}</span>
+  let html = `<div style="margin-bottom:16px;">`;
+  html += `<div style="margin-bottom:8px;">
+    <span style="background:#0f172a;color:#fff;font-size:9.5pt;font-weight:bold;letter-spacing:0.04em;padding:4px 10px;border-radius:6px;">${taskLabel}</span>
+    <span style="background:#0e7490;color:#fff;font-size:11pt;font-weight:bold;padding:4px 12px;border-radius:999px;margin-left:6px;">Band ${showBand(score.band)}</span>
   </div>`;
 
-  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:12px;">`;
-  criteriaLabels.forEach((c) => {
-    html += `<tr>
-      <td style="border:1px solid #e2e8f0;padding:7px 12px;font-size:11.5pt;color:#475569;">${c.label}</td>
-      <td style="border:1px solid #e2e8f0;padding:7px 12px;font-size:11.5pt;font-weight:bold;color:#0f172a;text-align:right;width:70px;">${formatBandScore((score as unknown as Record<string, number>)[c.key])}</td>
-    </tr>`;
-  });
-  html += `</table>`;
+  // Bảng điểm 4 tiêu chí — cố tình làm nổi bật (nền đậm, số to) để không bị lẫn
+  // vào phần nhận xét dài phía dưới, tránh cảm giác "không thấy điểm đâu".
+  html += `<table style="width:100%;border-collapse:collapse;margin-bottom:8px;table-layout:fixed;">
+    <tr>${criteriaLabels.map((c) => `<td style="border:1px solid #e2e8f0;background:#f1f5f9;padding:4px 6px;font-size:8pt;font-weight:bold;color:#64748b;text-align:center;">${escapeHtml(c.label)}</td>`).join("")}</tr>
+    <tr>${criteriaLabels
+      .map(
+        (c) =>
+          `<td style="border:1px solid #e2e8f0;padding:5px 6px;font-size:13pt;font-weight:bold;color:#0e7490;text-align:center;">${showBand((score as unknown as Record<string, number>)[c.key])}</td>`,
+      )
+      .join("")}</tr>
+  </table>`;
 
   // Nhận xét: thử parse theo cấu trúc "### 1. ... / ### 2. ..." giống ExaminerSummaryCard,
   // nếu không khớp format thì hiện nguyên đoạn văn (đã in đậm ** và bỏ Band sai lệch).
@@ -374,26 +385,26 @@ function buildTaskFeedbackHtml(
   if (criteria.length === 0 && diagnosis.length === 0) {
     const sanitized = sanitizeBandMentions(summary, validBands);
     if (sanitized.trim()) {
-      html += `<div style="border-left:4px solid #22d3ee;background:#fff;border:1px solid #cffafe;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
-        <p style="margin:0;font-size:12pt;line-height:1.6;color:#334155;">${renderInlineHtml(sanitized)}</p>
+      html += `<div style="border-left:3px solid #22d3ee;background:#fff;border:1px solid #cffafe;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+        <p style="margin:0;font-size:10.5pt;line-height:1.5;color:#334155;">${renderInlineHtml(sanitized)}</p>
       </div>`;
     }
   } else {
     if (criteria.length > 0) {
-      html += `<p style="font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 8px 0;">Phân tích 4 tiêu chí chấm điểm</p>`;
+      html += `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:0 0 6px 0;">Phân tích 4 tiêu chí chấm điểm</p>`;
       criteria.forEach((item) => {
-        html += `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-          <p style="margin:0 0 3px 0;font-size:12pt;font-weight:bold;color:#1e293b;">${criterionEmoji(item.label)} ${escapeHtml(item.label)}</p>
-          <p style="margin:0;font-size:11.5pt;line-height:1.6;color:#475569;">${renderInlineHtml(sanitizeBandMentions(item.content, validBands))}</p>
+        html += `<div style="border:1px solid #e2e8f0;border-radius:8px;padding:7px 9px;margin-bottom:6px;">
+          <p style="margin:0 0 2px 0;font-size:10.5pt;font-weight:bold;color:#1e293b;">${criterionEmoji(item.label)} ${escapeHtml(item.label)}</p>
+          <p style="margin:0;font-size:10pt;line-height:1.5;color:#475569;">${renderInlineHtml(sanitizeBandMentions(item.content, validBands))}</p>
         </div>`;
       });
     }
     if (diagnosis.length > 0) {
-      html += `<p style="font-size:10.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:12px 0 8px 0;">Chẩn đoán chuyên sâu</p>`;
+      html += `<p style="font-size:8.5pt;font-weight:bold;letter-spacing:0.03em;text-transform:uppercase;color:#94a3b8;margin:8px 0 6px 0;">Chẩn đoán chuyên sâu</p>`;
       diagnosis.forEach((item) => {
         const style = diagnosisStyle(item.label);
-        html += `<div style="background:${style.bg};border:1px solid ${style.border};border-radius:10px;padding:10px 12px;margin-bottom:8px;">
-          <p style="margin:0;font-size:11.5pt;line-height:1.6;color:#334155;">${style.emoji} ${
+        html += `<div style="background:${style.bg};border:1px solid ${style.border};border-radius:8px;padding:7px 9px;margin-bottom:6px;">
+          <p style="margin:0;font-size:10pt;line-height:1.5;color:#334155;">${style.emoji} ${
           item.label ? `<strong style="color:${style.color};">${escapeHtml(item.label)}: </strong>` : ""
         }${renderInlineHtml(sanitizeBandMentions(item.content, validBands))}</p>
         </div>`;
@@ -417,10 +428,10 @@ function buildFeedbackHtml(feedback: GradingFeedback, task1Answer?: string, task
   let html = `<div>`;
   // Bảng thay vì flexbox: Word không tin cậy display:flex khi convert HTML -> .doc,
   // dùng table 2 cột đảm bảo 2 phần luôn nằm ngang hàng khi mở bằng Word thật.
-  html += `<table style="width:100%;background:#0f172a;border-radius:12px;border-collapse:collapse;margin-bottom:16px;">
+  html += `<table style="width:100%;background:#0f172a;border-radius:10px;border-collapse:collapse;margin-bottom:12px;">
     <tr>
-      <td style="padding:14px 18px;color:#e2e8f0;font-size:13pt;font-weight:bold;">Đánh giá từ AI Examiner</td>
-      <td style="padding:14px 18px;color:#22d3ee;font-size:18pt;font-weight:bold;text-align:right;">Overall ${formatBandScore(feedback.overall_band)}</td>
+      <td style="padding:10px 14px;color:#e2e8f0;font-size:11pt;font-weight:bold;">Đánh giá từ AI Examiner</td>
+      <td style="padding:10px 14px;color:#22d3ee;font-size:16pt;font-weight:bold;text-align:right;">Overall ${showBand(feedback.overall_band)}</td>
     </tr>
   </table>`;
 
@@ -440,9 +451,9 @@ function buildFeedbackHtml(feedback: GradingFeedback, task1Answer?: string, task
   // Dữ liệu cũ chấm trước khi có task1/task2 tách riêng — không có feedback.task1/task2
   // nên 2 khối trên không render gì, fallback về examiner_summary thô (vẫn in đậm ** cho dễ đọc).
   if (!feedback.task1 && !feedback.task2 && feedback.examiner_summary) {
-    html += `<div style="border-left:4px solid #22d3ee;background:#fff;border:1px solid #cffafe;border-radius:10px;padding:12px 14px;margin-bottom:12px;">
-      <p style="margin:0 0 6px 0;font-size:13pt;font-weight:bold;color:#0f172a;">Nhận xét tổng quan</p>
-      <p style="margin:0;font-size:12pt;line-height:1.6;color:#334155;">${renderInlineHtml(feedback.examiner_summary)}</p>
+    html += `<div style="border-left:3px solid #22d3ee;background:#fff;border:1px solid #cffafe;border-radius:8px;padding:9px 11px;margin-bottom:8px;">
+      <p style="margin:0 0 4px 0;font-size:11pt;font-weight:bold;color:#0f172a;">Nhận xét tổng quan</p>
+      <p style="margin:0;font-size:10.5pt;line-height:1.5;color:#334155;">${renderInlineHtml(feedback.examiner_summary)}</p>
     </div>`;
     html += buildCorrectionsHtml(feedback.corrections ?? []);
   }
@@ -456,20 +467,20 @@ function buildFeedbackHtml(feedback: GradingFeedback, task1Answer?: string, task
 function buildFullDocHtml(studentName: string, sections: ExportSections, feedback?: GradingFeedback | null): string {
   const header =
     `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>Export HTML To Doc</title><style>` +
-    `body { font-family: ${DOC_FONT}; font-size: 12pt; line-height: 1.55; color: #1e293b; } ` +
+    `body { font-family: ${DOC_FONT}; font-size: 10.5pt; line-height: 1.5; color: #1e293b; } ` +
     `h2, h3, h4 { font-family: ${DOC_FONT}; }` +
     `</style></head><body>`;
   const footer = "</body></html>";
 
-  let sourceHTML = `<h2 style="font-size:20pt;text-align:center;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:12px;margin:0 0 16px 0;">Bài làm của ${escapeHtml(studentName)}</h2>`;
+  let sourceHTML = `<h2 style="font-size:16pt;text-align:center;color:#0f172a;border-bottom:2px solid #e2e8f0;padding-bottom:8px;margin:0 0 12px 0;">Bài làm của ${escapeHtml(studentName)}</h2>`;
   const task1Corrections = feedback ? resolveTaskCorrections(feedback, "task1", sections.task1Answer) : [];
   const task2Corrections = feedback ? resolveTaskCorrections(feedback, "task2", sections.task2Answer) : [];
   sourceHTML += buildTaskSectionsHtml(sections, task1Corrections, task2Corrections);
 
   if (sections.teacherComment && sections.teacherComment.trim()) {
-    sourceHTML += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:16px;margin-top:28px;">
-      <h3 style="font-size:13pt;color:#059669;margin:0 0 8px 0;">Nhận xét bổ sung của giáo viên</h3>
-      <p style="white-space:pre-wrap;font-size:12pt;line-height:1.9;margin:0;">${escapeHtml(sections.teacherComment)}</p>
+    sourceHTML += `<div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:8px;padding:11px;margin-top:16px;">
+      <h3 style="font-size:11pt;color:#059669;margin:0 0 6px 0;">Nhận xét bổ sung của giáo viên</h3>
+      <p style="white-space:pre-wrap;font-size:10.5pt;line-height:1.6;margin:0;">${escapeHtml(sections.teacherComment)}</p>
     </div>`;
   }
 
