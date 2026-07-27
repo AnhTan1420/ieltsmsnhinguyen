@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertOctagon, Languages, Star, Lightbulb, Target, Link2, SpellCheck2, PenTool } from "lucide-react";
-import { sanitizeBandMentions } from "./band-sanitizer";
+import { sanitizeBandMentions } from "@/lib/teacher/band-sanitizer";
 
 type CriterionItem = { label: string; content: string };
 type DiagnosisItem = { label: string | null; content: string };

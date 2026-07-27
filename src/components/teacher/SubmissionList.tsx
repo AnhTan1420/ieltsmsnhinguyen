@@ -2,7 +2,7 @@
 
 import { Archive, CheckSquare, Clock, Loader2, ShieldAlert, Sparkles, Square, Timer, Trash2 } from "lucide-react";
 import type { SubmissionRow } from "@/lib/types";
-import { statusLabels, statusStyles, formatDateTime, formatDuration } from "./submission-utils";
+import { statusLabels, statusStyles, formatDateTime, formatDuration } from "@/lib/teacher/submission-utils";
 
 type SubmissionListProps = {
   submissions: SubmissionRow[];

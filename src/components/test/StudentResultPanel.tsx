@@ -6,7 +6,7 @@ import type { GradingFeedback } from "@/lib/types";
 import {
   resolveTaskSummary,
   formatBandScore,
-} from "@/components/teacher/GradingResultPanel";
+} from "@/lib/grading/feedback-resolvers";
 import ExaminerSummaryCard from "@/components/teacher/ExaminerSummaryCard";
 import { parseSubmissionContent } from "@/lib/grading/parse";
 import { downloadSubmissionDoc } from "@/lib/teacher/exportDoc";

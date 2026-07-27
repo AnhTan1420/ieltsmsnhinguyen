@@ -1,12 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Info, Send, ShieldAlert, Timer, User } from "lucide-react";
-import { useAntiCheat } from "@/hooks/useAntiCheat";
-import { useExamTimer } from "@/hooks/useExamTimer";
-import { exitFullscreenSafe } from "@/lib/device-utils";
-import { AUTOSAVE_INTERVAL_MS, TASK1_MIN_WORDS, TASK2_MIN_WORDS, countWords, scrollToRef } from "@/lib/student-test-utils";
-import NavPill from "./NavPill";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, Send } from "lucide-react";
+import { useStudentTestState } from "@/hooks/useStudentTestState";
+import { TASK1_MIN_WORDS, TASK2_MIN_WORDS, countWords } from "@/lib/student-test-utils";
+import ExamHeader from "./ExamHeader";
+import { AntiCheatWarningBanner, FullscreenUnsupportedNotice } from "./AntiCheatWarningBanner";
 import TaskCard from "./TaskCard";
 import SetupScreen from "./SetupScreen";
 import DisqualifiedScreen from "./DisqualifiedScreen";
@@ -23,12 +22,10 @@ export interface StudentTestProps {
   blockCopyPaste?: boolean;
 }
 
-type Step = "setup" | "testing" | "submitted" | "disqualified";
 
-// Cấu hình thời gian lưu trữ màn hình chờ/kết quả (1 tiếng = 60 phút * 60 giây * 1000 ms)
-const RESULT_EXPIRY_TIME_MS = 60 * 60 * 1000;
-const getStorageKey = (testId: string) => `test_submission_state_${testId}`;
-
+// Orchestrator: gọi useStudentTestState() để lấy toàn bộ state/handler, tự lo
+// duy nhất phần UI cục bộ còn lại (phóng to ảnh Task 1) và ghép các màn hình
+// (setup/testing/submitted/disqualified) + ExamHeader + 2x TaskCard lại.
 export default function StudentTest({
   testId,
   title,
@@ -38,63 +35,10 @@ export default function StudentTest({
   durationMinutes,
   blockCopyPaste = false,
 }: StudentTestProps) {
-  const [step, setStep] = useState<Step>("setup");
-  const [studentName, setStudentName] = useState("");
-
-  const [task1Answer, setTask1Answer] = useState("");
-  const [task2Answer, setTask2Answer] = useState("");
-
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
-  const [startedAt, setStartedAt] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isImageZoomed, setIsImageZoomed] = useState(false);
-
   const task1Ref = useRef<HTMLElement | null>(null);
   const task2Ref = useRef<HTMLElement | null>(null);
   const submitRef = useRef<HTMLDivElement | null>(null);
-
-  // LOGIC KIỂM TRA TRẠNG THÁI LƯU TRỮ (LOCALSTORAGE) KHI TRANG VỪA LOAD
-  useEffect(() => {
-    if (!testId) return;
-
-    const storageKey = getStorageKey(testId);
-    const storedData = localStorage.getItem(storageKey);
-
-    if (storedData) {
-      try {
-        const parsed = JSON.parse(storedData);
-        const currentTime = new Date().getTime();
-
-        if (currentTime < parsed.expiryTime) {
-          // Còn hạn: Khôi phục lại trạng thái "submitted"
-          setStep(parsed.step);
-          setSubmissionId(parsed.submissionId);
-
-          // Cài đặt bộ đếm giờ tự động reset khi đúng 5 phút trôi qua (khi user đang treo máy ở trang kết quả)
-          const timeRemaining = parsed.expiryTime - currentTime;
-          const timer = setTimeout(() => {
-            localStorage.removeItem(storageKey);
-            window.location.reload(); 
-          }, timeRemaining);
-
-          return () => clearTimeout(timer);
-        } else {
-          // Hết hạn (> 5 phút): Xóa dữ liệu cũ, hệ thống tự động ở màn "setup" để làm bài lại
-          localStorage.removeItem(storageKey);
-        }
-      } catch (err) {
-        localStorage.removeItem(storageKey);
-      }
-    }
-  }, [testId]);
-
-  // Keep the latest answers in refs so the timer's onExpire callback (created once)
-  // can always read the current text without needing to be re-created every keystroke.
-  const answersRef = useRef({ task1Answer: "", task2Answer: "" });
-  useEffect(() => {
-    answersRef.current = { task1Answer, task2Answer };
-  }, [task1Answer, task2Answer]);
 
   // Đóng ảnh phóng to bằng phím Esc cho tiện thao tác trong lúc thi.
   useEffect(() => {
@@ -106,193 +50,27 @@ export default function StudentTest({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isImageZoomed]);
 
-  // Tính năng "Chặn copy/paste" — giáo viên bật/tắt theo từng đề thi trong panel
-  // "Chỉnh sửa Đề thi". Khi bật, học sinh không thể copy/paste/cut trong lúc làm
-  // bài (step "testing"); chỉ ngăn hành vi mặc định của trình duyệt, không chặn
-  // gõ phím bình thường. Tắt cờ này thì không gắn listener nào -> copy/paste
-  // hoạt động bình thường như cũ.
-  //
-  // Gắn ở CAPTURE PHASE (tham số thứ 3 = true) thay vì bubble mặc định, để
-  // listener này chạy SỚM NHẤT trong pha capture, trước khi sự kiện lan tới
-  // bất kỳ phần tử con nào (textarea, input...) — tránh trường hợp 1 handler
-  // khác gọi stopPropagation() khiến document không nhận được sự kiện nữa.
-  const blockCopyPasteRef = useRef(blockCopyPaste);
-  useEffect(() => {
-    blockCopyPasteRef.current = blockCopyPaste;
-  }, [blockCopyPaste]);
-
-  useEffect(() => {
-    if (step !== "testing") return;
-
-    const preventClipboardAction = (e: ClipboardEvent) => {
-      if (!blockCopyPasteRef.current) return;
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    document.addEventListener("copy", preventClipboardAction, true);
-    document.addEventListener("paste", preventClipboardAction, true);
-    document.addEventListener("cut", preventClipboardAction, true);
-
-    return () => {
-      document.removeEventListener("copy", preventClipboardAction, true);
-      document.removeEventListener("paste", preventClipboardAction, true);
-      document.removeEventListener("cut", preventClipboardAction, true);
-    };
-  }, [step]);
-
-  // Lớp phòng thủ thứ 2, gắn thẳng trên React onCopy/onPaste/onCut của <form> làm
-  // bài (xem bên dưới) — dùng cùng cờ blockCopyPaste, phòng khi 1 phần tử con
-  // nào đó (vd thư viện textarea) chặn sự kiện lan tới document ở trên.
-  const handleClipboardEvent = useCallback(
-    (e: React.ClipboardEvent) => {
-      if (blockCopyPaste && step === "testing") {
-        e.preventDefault();
-      }
-    },
-    [blockCopyPaste, step],
-  );
-
-  const buildCombinedContent = useCallback(
-    (t1: string, t2: string) =>
-      `=== THÔNG TIN HỌC SINH ===\nHọ và tên: ${studentName}\n\n=== TASK 1 ===\n${t1}\n\n=== TASK 2 ===\n${t2}`,
-    [studentName],
-  );
-
-  const finalizeSubmission = useCallback(
-    async (reason: "manual" | "timeout") => {
-      if (!submissionId) return;
-      setIsSubmitting(true);
-      setError(null);
-
-      const { task1Answer: t1, task2Answer: t2 } = answersRef.current;
-      const combinedContent = buildCombinedContent(t1, t2);
-
-      try {
-        const response = await fetch(`/api/submissions/${submissionId}/submit`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: combinedContent, reason }),
-        });
-
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({}));
-          throw new Error(data.error ?? "Có lỗi xảy ra khi nộp bài.");
-        }
-
-        await exitFullscreenSafe();
-        setStep("submitted");
-
-        // Ghi lại trạng thái vào bộ nhớ cục bộ để chống F5 (Lưu trong 5 phút)
-        const storageKey = getStorageKey(testId);
-        localStorage.setItem(storageKey, JSON.stringify({
-          step: "submitted",
-          submissionId,
-          expiryTime: new Date().getTime() + RESULT_EXPIRY_TIME_MS,
-        }));
-
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Có lỗi xảy ra khi nộp bài.");
-      } finally {
-        setIsSubmitting(false);
-      }
-    },
-    [submissionId, buildCombinedContent, testId],
-  );
-
-  const handleTimeExpired = useCallback(() => {
-    void finalizeSubmission("timeout");
-  }, [finalizeSubmission]);
-
-  const { warnings, maxWarnings, isLocked, fullscreenSupported, enterFullscreen } = useAntiCheat({
+  const {
+    step,
+    studentName,
+    setStudentName,
+    task1Answer,
+    setTask1Answer,
+    task2Answer,
+    setTask2Answer,
     submissionId,
-    enabled: step === "testing",
-    onWarning: (warningCount, reason) => {
-      console.warn(`Cảnh báo lần ${warningCount} do: ${reason}`);
-    },
-    onDisqualified: () => {
-      setStep("disqualified");
-      // Auto-save answers when disqualified
-      if (submissionId) {
-        const { task1Answer: t1, task2Answer: t2 } = answersRef.current;
-        const combinedContent = buildCombinedContent(t1, t2);
-        void fetch(`/api/submissions/${submissionId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: combinedContent,
-            end_reason: "disqualified",
-            status: "disqualified"
-          }),
-        }).catch((err) => console.error("Không lưu được bài làm khi hủy thi:", err));
-      }
-    },
-  });
-
-  const { formatted, isLow } = useExamTimer({
-    startedAt,
-    durationMinutes,
-    enabled: step === "testing",
-    onExpire: handleTimeExpired,
-  });
-
-  // Autosave periodically so the teacher dashboard can watch the essay live.
-  useEffect(() => {
-    if (step !== "testing" || !submissionId) return;
-
-    const interval = setInterval(() => {
-      const { task1Answer: t1, task2Answer: t2 } = answersRef.current;
-      const combinedContent = buildCombinedContent(t1, t2);
-      void fetch(`/api/submissions/${submissionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: combinedContent }),
-      }).catch((err) => console.error("Autosave thất bại:", err));
-    }, AUTOSAVE_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [step, submissionId, buildCombinedContent]);
-
-  const handleStartTest = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!studentName.trim()) {
-      setError("Vui lòng nhập họ và tên của bạn.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      await enterFullscreen();
-
-      const response = await fetch("/api/submissions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ testId, studentName: studentName.trim() }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Không thể khởi tạo bài thi.");
-
-      setSubmissionId(data.submissionId);
-      setStartedAt(data.startedAt);
-      setStep("testing");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể khởi tạo bài thi. Vui lòng thử lại.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleSubmitFinal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!task1Answer.trim() && !task2Answer.trim()) {
-      setError("Vui lòng làm ít nhất một phần bài thi trước khi nộp.");
-      return;
-    }
-    await finalizeSubmission("manual");
-  };
+    isSubmitting,
+    error,
+    warnings,
+    maxWarnings,
+    isLocked,
+    fullscreenSupported,
+    formatted,
+    isLow,
+    handleClipboardEvent,
+    handleStartTest,
+    handleSubmitFinal,
+  } = useStudentTestState({ testId, durationMinutes, blockCopyPaste });
 
   if (step === "setup") {
     return (
@@ -327,81 +105,24 @@ export default function StudentTest({
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-950">
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0b0f17]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0b0f17]/80">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
-          <div className="min-w-0">
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-cyan-400/80">
-              IELTS Writing Test
-            </p>
-            <h1 className="truncate text-lg font-bold leading-tight text-white">{title}</h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-3">
-            <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-slate-300 sm:flex">
-              <User className="h-3.5 w-3.5 text-slate-400" />
-              <span className="font-semibold text-white">{studentName}</span>
-            </div>
-            <div
-              className={`flex items-center gap-2 rounded-full px-4 py-2 font-mono text-lg font-bold tabular-nums ${
-                isLow
-                  ? "animate-pulse bg-red-500/15 text-red-300 ring-1 ring-red-500/40"
-                  : "bg-cyan-500/10 text-cyan-300 ring-1 ring-cyan-500/20"
-              }`}
-            >
-              <Timer className="h-4 w-4" />
-              {formatted}
-            </div>
-          </div>
-        </div>
-
-        <div className="border-t border-white/5">
-          <div className="no-scrollbar mx-auto flex max-w-6xl items-center gap-2 overflow-x-auto px-6 py-2.5">
-            {hasTask1 && <NavPill label="Task 1" done={task1Words > 0} onClick={() => scrollToRef(task1Ref)} />}
-            {hasTask2 && <NavPill label="Task 2" done={task2Words > 0} onClick={() => scrollToRef(task2Ref)} />}
-            <span className="flex-1" />
-            <button
-              type="button"
-              onClick={() => scrollToRef(submitRef)}
-              className="shrink-0 whitespace-nowrap rounded-full border border-cyan-500/20 px-3 py-1.5 text-xs font-semibold text-cyan-400 transition hover:border-cyan-500/40 hover:text-cyan-300"
-            >
-              Đi tới nộp bài →
-            </button>
-          </div>
-        </div>
-      </header>
+      <ExamHeader
+        title={title}
+        studentName={studentName}
+        formatted={formatted}
+        isLow={isLow}
+        hasTask1={hasTask1}
+        hasTask2={hasTask2}
+        task1Done={task1Words > 0}
+        task2Done={task2Words > 0}
+        task1Ref={task1Ref}
+        task2Ref={task2Ref}
+        submitRef={submitRef}
+      />
 
       <div className="mx-auto max-w-6xl px-6 py-8">
-        {fullscreenSupported === false && (
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
-            <Info className="h-5 w-5 shrink-0" />
-            Trình duyệt trên thiết bị này không hỗ trợ chế độ toàn màn hình (thường gặp trên Safari
-            iPhone/iPad), nên bài thi sẽ chạy ở chế độ bình thường. Hệ thống vẫn giám sát việc chuyển
-            tab/ứng dụng khác như bình thường.
-          </div>
-        )}
+        {fullscreenSupported === false && <FullscreenUnsupportedNotice />}
 
-        {warnings > 0 && (
-          <div
-            className={`mb-6 flex items-center justify-between gap-4 rounded-2xl px-6 py-4 shadow-sm ${
-              warnings >= maxWarnings
-                ? "animate-pulse border border-red-400 bg-red-200 text-red-900"
-                : "border border-red-300 bg-red-100 text-red-800"
-            }`}
-          >
-            <div className="flex items-center gap-3 font-semibold">
-              <ShieldAlert className="h-6 w-6 shrink-0 text-red-600" />
-              <span>
-                {warnings >= maxWarnings
-                  ? "Bạn đã vi phạm quá số lần cho phép! Bài thi bị hủy."
-                  : `Cảnh báo vi phạm quy chế thi: Bạn đã thoát toàn màn hình hoặc chuyển tab. ${
-                      warnings >= maxWarnings - 1 ? "Lần tiếp theo bài thi sẽ bị hủy!" : ""
-                    }`}
-              </span>
-            </div>
-            <span className="shrink-0 rounded-lg bg-red-200 px-3 py-1 text-lg font-bold">
-              {warnings} / {maxWarnings}
-            </span>
-          </div>
-        )}
+        <AntiCheatWarningBanner warnings={warnings} maxWarnings={maxWarnings} />
 
         {error && (
           <div className="mb-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 font-semibold text-red-900">
