@@ -50,20 +50,38 @@ src/
 │   │   └── AuthStatus.tsx
 │   │
 │   ├── teacher/                      # Toàn bộ UI trang giáo viên
-│   │   ├── TeacherDashboard.tsx           # Orchestrator: layout, tab, ghép các hook + component con
+│   │   ├── TeacherDashboard/              # Orchestrator: layout, tab, ghép các hook + component con
+│   │   │   ├── index.tsx                      # State cấp trang (tab, bộ lọc lớp, master-detail mobile) + compose
+│   │   │   ├── DashboardHeader.tsx            # Header dính đầu trang: logo, trạng thái Realtime, đăng xuất, tab strip
+│   │   │   ├── ClassFilterTabs.tsx            # Thanh tab lọc bài nộp theo lớp
+│   │   │   ├── ScrollbarStyles.tsx            # CSS .custom-scrollbar/.no-scrollbar dùng toàn dashboard
+│   │   │   └── TeacherAuthScreens.tsx         # Màn "đang kiểm tra đăng nhập" / "chưa đăng nhập"
 │   │   ├── SubmissionList.tsx             # Danh sách bài nộp + chọn nhiều/xóa hàng loạt/tải tất cả
-│   │   ├── SubmissionDetail.tsx           # Chi tiết 1 bài làm: nội dung, hành động chấm/xuất/xóa, nhận xét
-│   │   ├── GradingResultPanel.tsx         # Khối hiển thị kết quả chấm AI (band, tiêu chí, lỗi sửa)
+│   │   ├── SubmissionDetail/              # Chi tiết 1 bài làm
+│   │   │   ├── index.tsx                      # State (task đang mở, cụm highlight chọn, nháp nhận xét) + compose
+│   │   │   ├── SubmissionHeader.tsx           # Tên học sinh/đề thi, badge trạng thái, banner cảnh báo
+│   │   │   ├── TaskAnswerBlock.tsx            # Khối Task 1/Task 2 thu gọn-mở rộng (dùng chung cho cả 2 task)
+│   │   │   ├── HighlightDetailPanel.tsx       # Panel/bottom-sheet chi tiết lỗi-sai/nâng-cấp/cấu-trúc khi bấm vào highlight
+│   │   │   ├── SubmissionActions.tsx          # Cụm nút chấm/xuất file/xóa
+│   │   │   └── TeacherCommentBox.tsx          # Ô nhận xét thủ công của giáo viên
+│   │   ├── GradingResultPanel/            # Khối hiển thị kết quả chấm AI (band, tiêu chí, lỗi sửa)
+│   │   │   ├── index.tsx                      # Header Overall band + ghép TaskResultSection cho task1/task2
+│   │   │   ├── TaskResultSection.tsx          # Toàn bộ kết quả 1 task — dùng chung cho Task 1 & 2
+│   │   │   ├── CorrectionsSection.tsx         # Danh sách lỗi sai & đề xuất sửa (thu gọn/mở rộng)
+│   │   │   └── TaskExtras.tsx                 # Nguyên tắc vàng, lộ trình band, từ vựng, cấu trúc nâng cao, câu nâng cấp
 │   │   ├── ExaminerSummaryCard.tsx        # Thẻ nhận xét giám khảo, tách theo từng phần bài viết
-│   │   ├── band-sanitizer.ts              # Lọc câu văn xuôi nhắc sai số band không khớp điểm đã chấm
-│   │   ├── submission-utils.tsx           # Style/label trạng thái + helper dùng chung 3 file trên
-│   │   ├── ExamCreateForm.tsx             # Tab "Quản lý đề thi" (dùng hook useTests) — kể cả chọn lớp, bật chặn copy/paste
+│   │   ├── ExamCreateForm/                # Tab "Quản lý đề thi"
+│   │   │   ├── index.tsx                      # State (đề đang sửa, cờ lưu/upload) + handler + compose
+│   │   │   ├── TestBankList.tsx               # Cột trái: danh sách đề đã tạo
+│   │   │   └── TestEditorForm.tsx             # Cột phải: form soạn/sửa đề (kể cả chọn lớp, bật chặn copy/paste)
 │   │   ├── ClassManagement.tsx            # Tab "Quản lý lớp học" — CRUD lớp (dùng hook useClasses)
 │   │   ├── GradingProgressModal.tsx       # Modal "đang chấm điểm"
 │   │   └── FeedbackExport.tsx
 │   │
 │   └── test/                         # Toàn bộ UI trang học sinh làm bài
-│       ├── StudentTest.tsx               # Orchestrator: state + gọi API start/autosave/submit
+│       ├── StudentTest.tsx               # Orchestrator: gọi useStudentTestState() + ghép các màn hình/component
+│       ├── ExamHeader.tsx                # Header dính đầu trang lúc làm bài: tên đề, tên học sinh, đồng hồ, nav pill
+│       ├── AntiCheatWarningBanner.tsx    # Banner cảnh báo vi phạm + thông báo trình duyệt không hỗ trợ fullscreen
 │       ├── SetupScreen.tsx               # Màn hình nhập tên trước khi thi
 │       ├── TaskCard.tsx                  # Thẻ đề bài + khung viết (dùng chung Task 1 & 2)
 │       ├── NavPill.tsx                   # Nút điều hướng nhanh trong sub-nav
@@ -79,6 +97,7 @@ src/
 │   │   ├── useBulkActions.ts             # Chọn nhiều, xóa hàng loạt, tải tất cả (.zip)
 │   │   ├── useTests.ts                   # CRUD đề thi + upload ảnh Task 1
 │   │   └── useClasses.ts                 # CRUD lớp học (dùng chung bởi tab "Quản lý lớp học" và ExamCreateForm)
+│   ├── useStudentTestState.ts         # Toàn bộ state/effect/handler trang làm bài (resume F5, chặn copy/paste, autosave, nối useAntiCheat/useExamTimer)
 │   ├── useAntiCheat.ts                # Phát hiện & báo cáo hành vi gian lận (học sinh); fullscreen qua lib/device-utils
 │   ├── useExamTimer.ts                # Đếm ngược dựa trên mốc thời gian từ server (học sinh)
 │   └── useNow.ts                      # Tick Date.now() mỗi giây — dùng cho nhãn "cập nhật x giây trước"
@@ -95,12 +114,21 @@ src/
     │   ├── prompt.ts                      # TASK_CONFIG + system prompt giám khảo IELTS
     │   ├── provider.ts                    # Gọi Gemini (chính) → fallback Groq khi lỗi/quá tải
     │   ├── parse.ts                       # Parse & làm sạch JSON model trả về + parseSubmissionContent
-    │   └── schema.ts                      # Schema/kiểu dữ liệu response kỳ vọng từ model
+    │   ├── schema.ts                      # Schema/kiểu dữ liệu response kỳ vọng từ model
+    │   └── feedback-resolvers.ts          # Logic thuần lấy đúng dữ liệu 1 task từ GradingFeedback (band/summary/corrections/...), có fallback cho bản ghi cũ
     └── teacher/
-        └── exportDoc.ts                # Build & tải file .doc / .zip cho 1 hoặc nhiều bài làm
+        ├── band-sanitizer.ts           # Lọc câu văn xuôi nhắc sai số band không khớp điểm đã chấm
+        ├── submission-utils.tsx        # Style/label trạng thái + renderHighlightedAnswer dùng chung SubmissionDetail/GradingResultPanel
+        └── exportDoc/                  # Build & tải file .doc / .zip cho 1 hoặc nhiều bài làm
+            ├── index.ts                    # API công khai (giữ nguyên đường dẫn import @/lib/teacher/exportDoc)
+            ├── html-helpers.ts             # escape/in-đậm markdown/tô highlight/emoji tiêu chí — helper HTML cấp thấp
+            ├── image.ts                    # Tải ảnh Task 1 về base64 + tính lại kích thước để Word hiển thị đúng
+            ├── task-sections-html.ts       # Dựng HTML đề bài + ảnh + bài làm (Task 1 & 2)
+            ├── feedback-sections-html.ts   # Dựng HTML từng mục nhỏ (nguyên tắc vàng, lộ trình band, từ vựng, cấu trúc, câu nâng cấp, lỗi sửa)
+            └── task-feedback-html.ts       # Ghép thành feedback đầy đủ 1 task / cả bài (band + 4 tiêu chí + nhận xét)
 ```
 
-**Nguyên tắc tổ chức:** mỗi trang lớn (`TeacherDashboard`, `StudentTest`) là một **orchestrator mỏng** — chỉ ghép state/hook cấp cao, còn UI chia theo màn hình/khu vực chức năng thành component con trong cùng thư mục con của `components/`, và logic nghiệp vụ (fetch, state phức tạp) tách riêng vào `hooks/teacher/`. Logic không phụ thuộc React (build prompt, parse JSON, build file export) nằm trong `lib/`, có thể unit-test độc lập.
+**Nguyên tắc tổ chức:** mỗi trang/khối UI đủ lớn (`TeacherDashboard`, `SubmissionDetail`, `GradingResultPanel`, `ExamCreateForm`, `StudentTest`...) là một thư mục con với `index.tsx` làm **orchestrator mỏng** — chỉ giữ state/hook cấp cao, còn UI chia theo màn hình/khu vực chức năng thành các component con nằm cùng thư mục. Component nào bị lặp lại gần như y hệt cho 2 trường hợp (khối Task 1 vs Task 2, ví dụ `TaskAnswerBlock`/`TaskResultSection`) được gộp thành 1 component dùng chung thay vì copy-paste. Logic nghiệp vụ nhiều state/effect (fetch, autosave, chống gian lận) tách riêng vào `hooks/` — ví dụ `useStudentTestState.ts` giữ toàn bộ state của trang làm bài để `StudentTest.tsx` chỉ còn lo render. Logic không phụ thuộc React (build prompt, parse JSON, build file export, tính band) nằm trong `lib/`, có thể unit-test độc lập — kể cả những hàm từng nằm "tạm" trong file component (`feedback-resolvers.ts` tách ra từ `GradingResultPanel.tsx` cũ) nay cũng đã chuyển đúng chỗ.
 
 ## Kiến trúc & luồng dữ liệu
 
