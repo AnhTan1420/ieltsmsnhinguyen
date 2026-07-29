@@ -181,9 +181,6 @@ export async function gradeSubmission(
   } catch (geminiError) {
     console.warn("⚠️ [grader] Gemini failed. Lỗi chi tiết:", geminiError);
 
-    // Lưu ý: llama trên Groq là model text-only, KHÔNG đọc được ảnh biểu đồ.
-    // Khi rớt xuống nhánh fallback này, Task 1 chỉ còn được chấm dựa trên mô
-    // tả bằng chữ của đề (testPrompt) — không có ảnh gốc để đối chiếu số liệu.
     try {
       return await gradeWithGroq(content, testPrompt, taskType);
     } catch (groqError) {
