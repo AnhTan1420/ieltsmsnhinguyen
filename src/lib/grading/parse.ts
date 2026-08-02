@@ -82,10 +82,14 @@ function toHalfBand(x: number): number {
   return Math.round(Math.min(Math.max(x, 1), 9) * 2) / 2;
 }
 
-function toWholeBand(x: any): number {
+function parseCriterionBand(x: any): number {
   const num = parseFloat(String(x));
   const validNum = isNaN(num) ? 1 : num;
-  // Math.round sẽ làm tròn về số nguyên gần nhất (vd: 6.4 -> 6; 6.5 -> 7)
+  // Đúng chuẩn IELTS thật: giám khảo CHỈ cho band SỐ NGUYÊN (1-9) cho từng
+  // tiêu chí riêng lẻ (TA/TR, CC, LR, GRA) — không có band lẻ .5 ở cấp độ
+  // này. Band .5 chỉ xuất hiện ở band tổng của 1 task / overall band, vốn là
+  // kết quả của việc lấy TRUNG BÌNH 4 số nguyên đó (xem toHalfBand ở dưới).
+  // (Trước đây có 1 bản sửa nhầm dùng toHalfBand ở đây — đã revert.)
   return Math.round(Math.min(Math.max(validNum, 1), 9));
 }
 
@@ -107,25 +111,25 @@ function sanitizeBands(raw: GradingFeedback, taskType: TaskType): GradingFeedbac
     raw.task1 = null;
   }
 
-  /// 2. CHUẨN HOÁ TASK 1 (ép về số nguyên dương)
+  /// 2. CHUẨN HOÁ TASK 1 (ép mỗi tiêu chí về số nguyên hợp lệ 1-9, đúng chuẩn IELTS)
   if (raw.task1) {
     const taScore = raw.task1.TA ?? (raw.task1 as any).TR ?? 1;
-    raw.task1.TA = toWholeBand(taScore);
-    raw.task1.CC = toWholeBand(raw.task1.CC ?? 1);
-    raw.task1.LR = toWholeBand(raw.task1.LR ?? 1);
-    raw.task1.GRA = toWholeBand(raw.task1.GRA ?? 1);
+    raw.task1.TA = parseCriterionBand(taScore);
+    raw.task1.CC = parseCriterionBand(raw.task1.CC ?? 1);
+    raw.task1.LR = parseCriterionBand(raw.task1.LR ?? 1);
+    raw.task1.GRA = parseCriterionBand(raw.task1.GRA ?? 1);
 
     const mean = (raw.task1.TA + raw.task1.CC + raw.task1.LR + raw.task1.GRA) / 4;
     raw.task1.band = toHalfBand(mean);
   }
 
-  // 3. CHUẨN HOÁ TASK 2 (ép về số nguyên dương)
+  // 3. CHUẨN HOÁ TASK 2 (ép mỗi tiêu chí về số nguyên hợp lệ 1-9, đúng chuẩn IELTS)
   if (raw.task2) {
     const trScore = raw.task2.TR ?? (raw.task2 as any).TA ?? 1;
-    raw.task2.TR = toWholeBand(trScore);
-    raw.task2.CC = toWholeBand(raw.task2.CC ?? 1);
-    raw.task2.LR = toWholeBand(raw.task2.LR ?? 1);
-    raw.task2.GRA = toWholeBand(raw.task2.GRA ?? 1);
+    raw.task2.TR = parseCriterionBand(trScore);
+    raw.task2.CC = parseCriterionBand(raw.task2.CC ?? 1);
+    raw.task2.LR = parseCriterionBand(raw.task2.LR ?? 1);
+    raw.task2.GRA = parseCriterionBand(raw.task2.GRA ?? 1);
 
     const mean = (raw.task2.TR + raw.task2.CC + raw.task2.LR + raw.task2.GRA) / 4;
     raw.task2.band = toHalfBand(mean);

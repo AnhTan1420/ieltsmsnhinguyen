@@ -84,9 +84,11 @@ export function resolveTaskAdvancedStructures(feedback: GradingFeedback, task: "
   return soloTaskOf(feedback) === task ? all : [];
 }
 
-// Hiển thị ĐÚNG giá trị band (band IELTS luôn là bội số 0.5, VD 7, 7.5, 8) —
-// KHÔNG làm tròn về số nguyên, vì Math.round(7.5) = 8 sẽ khiến điểm hiển thị
-// trông cao hơn thực tế, tạo cảm giác mâu thuẫn với overall band ở badge.
+// Hiển thị ĐÚNG giá trị band — KHÔNG làm tròn về số nguyên, vì Math.round(7.5) = 8
+// sẽ khiến điểm hiển thị trông cao hơn thực tế. Lưu ý: overall_band/task.band có
+// thể là half-band (VD 7.5, kết quả của việc lấy trung bình 4 tiêu chí); còn từng
+// tiêu chí riêng lẻ (TA/TR, CC, LR, GRA) đúng chuẩn IELTS luôn là số nguyên, nên
+// trong thực tế nhánh .5 của hàm này chỉ kích hoạt khi hiển thị band tổng.
 export function formatBandScore(score: unknown): string {
   const n = Number(score);
   if (score === undefined || score === null || Number.isNaN(n)) return String(score ?? "");

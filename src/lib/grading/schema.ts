@@ -9,15 +9,18 @@ export function buildGradingJsonSchema(taskType: TaskType) {
   // QUAN TRỌNG: Gemini không cho phép { type: "null" } đứng một mình làm schema
   // của 1 field. Field "có thể null" phải khai báo type thật (object) kèm
   // nullable: true — Gemini sẽ tự chọn trả object hoặc null cho field đó.
+  // Đúng chuẩn IELTS thật: từng tiêu chí (CC/LR/GRA/criterionKey) luôn là SỐ
+  // NGUYÊN 1-9, không có .5 — chỉ "band" (trung bình 4 tiêu chí) mới có thể
+  // là half-band. Khai báo type "integer" để ép luôn ở tầng structured output.
   const nullableTaskScoreSchema = {
     type: "object",
     nullable: true,
     properties: {
       band: { type: "number" },
-      CC: { type: "number" },
-      LR: { type: "number" },
-      GRA: { type: "number" },
-      [criterionKey]: { type: "number" },
+      CC: { type: "integer" },
+      LR: { type: "integer" },
+      GRA: { type: "integer" },
+      [criterionKey]: { type: "integer" },
     },
     required: ["band", "CC", "LR", "GRA", criterionKey],
   };
@@ -117,15 +120,18 @@ export function buildGradingJsonSchema(taskType: TaskType) {
 // Không dùng cho Gemini (Gemini vẫn nên dùng bản full ở trên).
 export function buildMinimalGradingJsonSchema(taskType: TaskType) {
   const criterionKey = taskType === "task1" ? "TA" : "TR";
+  // Đúng chuẩn IELTS thật: từng tiêu chí (CC/LR/GRA/criterionKey) luôn là SỐ
+  // NGUYÊN 1-9, không có .5 — chỉ "band" (trung bình 4 tiêu chí) mới có thể
+  // là half-band. Khai báo type "integer" để ép luôn ở tầng structured output.
   const nullableTaskScoreSchema = {
     type: "object",
     nullable: true,
     properties: {
       band: { type: "number" },
-      CC: { type: "number" },
-      LR: { type: "number" },
-      GRA: { type: "number" },
-      [criterionKey]: { type: "number" },
+      CC: { type: "integer" },
+      LR: { type: "integer" },
+      GRA: { type: "integer" },
+      [criterionKey]: { type: "integer" },
     },
     required: ["band", "CC", "LR", "GRA", criterionKey],
   };
