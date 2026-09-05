@@ -89,9 +89,23 @@ export async function POST(request: Request) {
       // mỗi lệnh có ngân sách thời gian riêng nhưng cùng bắt đầu đếm gần như
       // cùng lúc, nên tổng thời gian chờ thực tế vẫn bị chặn bởi budget này
       // (không cộng dồn 2 lần), vẫn nằm trong maxDuration đã sanity-check ở trên.
+      //
+      // STAGGER 1.2s cho lệnh Task 2: nếu bắn CẢ HAI request cùng lúc, cả 2
+      // đều gọi CÙNG model Gemini flash trong CÙNG một khoảnh khắc — với các
+      // API có giới hạn burst theo GIÂY (không chỉ theo phút), việc này tự
+      // nhân đôi khả năng dính 429 ngay từ request đầu tiên (thay vì do
+      // provider/model có vấn đề thật). Trễ nhẹ request thứ 2 không ảnh hưởng
+      // ngân sách thời gian CỦA NÓ (Deadline của gradeSubmission() chỉ bắt đầu
+      // đếm khi chính nó được gọi, không phải từ đầu handler), chỉ cộng thêm
+      // tối đa 1.2s vào tổng thời gian phản hồi — không đáng kể so với
+      // SAFETY_MARGIN_MS 5s đã có.
+      const STAGGER_MS = 1_200;
       const [feedback1, feedback2] = await Promise.all([
         gradeSubmission(content, task1Prompt, "task1", task1ImageUrl, DEFAULT_BUDGET_MS),
-        gradeSubmission(content, task2Prompt, "task2", undefined, DEFAULT_BUDGET_MS)
+        (async () => {
+          await new Promise((resolve) => setTimeout(resolve, STAGGER_MS));
+          return gradeSubmission(content, task2Prompt, "task2", undefined, DEFAULT_BUDGET_MS);
+        })(),
       ]);
 
       const fb1 = feedback1 as any;

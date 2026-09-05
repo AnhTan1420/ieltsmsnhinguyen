@@ -182,7 +182,7 @@ Mở [http://localhost:3000](http://localhost:3000). Deploy production dùng Ver
 | `GOOGLE_GEMINI_API_KEY` | ✅ | Provider chấm bài chính |
 | `GEMINI_MODEL` | ⛔ (mặc định `gemini-3.6-flash`) | Override model Gemini |
 | `GROQ_API_KEY` | ✅ | Provider chấm bài dự phòng khi Gemini lỗi/quá tải |
-| `GROQ_MODEL` | ⛔ (mặc định `llama-3.3-70b-versatile`) | Override model Groq |
+| `GROQ_MODEL` | ⛔ (mặc định `openai/gpt-oss-120b`) | Override model Groq |
 
 ## Schema cơ sở dữ liệu
 

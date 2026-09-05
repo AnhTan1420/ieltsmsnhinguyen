@@ -211,9 +211,12 @@ export function extractJson(raw: string, taskType: TaskType): GradingFeedback {
  *
  * Cũng bổ sung 500/502/504/408 — đây chính là các mã mà bản thân
  * @google/genai coi là "retryable" ở tầng nội bộ (DEFAULT_RETRY_HTTP_STATUS_CODES
- * trong SDK); nếu lỗi vẫn lọt ra tới tận đây nghĩa là SDK đã tự retry hết số
- * lần cho phép và vẫn fail — đáng để thử sang model/provider khác, không nên
- * bó tay ngay.
+ * trong SDK). LƯU Ý: gradeWithGemini() giờ đã set `retryOptions: { attempts: 1 }`
+ * trong httpOptions để TẮT hẳn retry nội bộ đó (xem comment ở provider.ts) —
+ * nên các mã này giờ lọt ra ngay từ lần gọi ĐẦU TIÊN, không phải sau khi SDK
+ * đã tự thử lại nhiều lần. Model-chain (Flash → Flash-Lite → Groq) đóng vai
+ * trò "thử lại" thay, bằng cách nhảy sang model/provider khác — nhanh hơn và
+ * hợp lý hơn retry mù quáng vào đúng chỗ vừa quá tải.
  */
 export function isFallbackWorthyError(err: any): boolean {
   if (err instanceof JsonExtractionError) return true;

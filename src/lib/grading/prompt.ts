@@ -39,9 +39,9 @@ Bước 4 — Kiểm tra câu mở đầu (background statement) có thực sự
 } as const;
 
 // ─────────────────────────────────────────────────────────────
-// Mode "minimal": dùng cho tier TPM cực thấp (vd Groq llama-3.1-8b-instant
-// free/on-demand, giới hạn 6000 token/phút CHO CẢ input lẫn max_tokens
-// output cộng lại). Chỉ giữ đúng phần lõi để chấm điểm được, bỏ hết phần
+// Mode "minimal": dùng cho tier TPM cực thấp (vd Groq openai/gpt-oss-20b
+// free/on-demand — model fallback khẩn cấp cuối chain, xem GROQ_MODEL_CHAIN
+// ở provider.ts). Chỉ giữ đúng phần lõi để chấm điểm được, bỏ hết phần
 // mở rộng (band_progression, vocabulary_suggestions, advanced_structures,
 // essay_upgrades) — các field này đã optional trong GradingFeedback
 // nên việc thiếu chúng không làm vỡ type/UI, chỉ đơn giản là không hiển thị.
