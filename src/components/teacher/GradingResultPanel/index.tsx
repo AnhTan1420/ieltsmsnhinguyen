@@ -33,13 +33,16 @@ type GradingResultPanelProps = {
   feedback: GradingFeedback;
   task1Answer?: string;
   task2Answer?: string;
+  // Xem chú thích ở TaskResultSectionProps.collapsible — mặc định false,
+  // không đổi hành vi hiện có ở /teacher (SubmissionDetail).
+  collapsible?: boolean;
 };
 
 // Panel "Đánh giá từ AI Examiner" — header Overall band + kết quả Task 1 và
 // Task 2 (TaskResultSection, dùng chung cho cả 2 task). File này chỉ lo lấy
 // dữ liệu đúng task qua các resolver rồi truyền xuống, không còn tự vẽ JSX
 // lặp lại cho từng task nữa.
-export default function GradingResultPanel({ feedback, task1Answer, task2Answer }: GradingResultPanelProps) {
+export default function GradingResultPanel({ feedback, task1Answer, task2Answer, collapsible = false }: GradingResultPanelProps) {
   const task1Corrections = feedback.task1 ? resolveTaskCorrections(feedback, "task1", task1Answer) : [];
   const task2Corrections = feedback.task2 ? resolveTaskCorrections(feedback, "task2", task2Answer) : [];
 
@@ -81,6 +84,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
             advancedStructures={resolveTaskAdvancedStructures(feedback, "task1")}
             essayUpgrades={resolveTaskEssayUpgrades(feedback, "task1")}
             legacyEditedEssay={resolveTaskEditedEssay(feedback, "task1")}
+            collapsible={collapsible}
           />
         )}
 
@@ -105,6 +109,7 @@ export default function GradingResultPanel({ feedback, task1Answer, task2Answer 
             advancedStructures={resolveTaskAdvancedStructures(feedback, "task2")}
             essayUpgrades={resolveTaskEssayUpgrades(feedback, "task2")}
             legacyEditedEssay={resolveTaskEditedEssay(feedback, "task2")}
+            collapsible={collapsible}
           />
         )}
       </div>

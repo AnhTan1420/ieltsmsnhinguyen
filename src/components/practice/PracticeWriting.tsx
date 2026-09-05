@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import type { GradingFeedback } from "@/lib/types";
 import { TASK1_MIN_WORDS, TASK2_MIN_WORDS, countWords } from "@/lib/student-test-utils";
+import {
+  resolveTaskAdvancedStructures,
+  resolveTaskCorrections,
+  resolveTaskEssayUpgrades,
+} from "@/lib/grading/feedback-resolvers";
+import type { HighlightItem } from "@/lib/teacher/submission-utils";
 import GradingResultPanel from "@/components/teacher/GradingResultPanel";
 import GradingProgressModal, { GRADING_STEPS } from "@/components/teacher/GradingProgressModal";
 import ChartImageDropzone from "@/components/teacher/ExamCreateForm/ChartImageDropzone";
+import SubmissionContentPanel from "./SubmissionContentPanel";
 
 type TaskType = "task1" | "task2";
 type Draft = { prompt: string; essay: string; imageDataUrl: string | null };
@@ -162,10 +169,32 @@ export default function PracticeWriting() {
     setError(null);
   }
 
+  // Gộp 3 loại phản hồi có thể highlight trong bài làm gốc (lỗi sai, câu nên
+  // viết hay hơn, gợi ý cấu trúc nâng cao) thành 1 danh sách — cùng cơ chế với
+  // allHighlightItems ở SubmissionDetail bên /teacher, nhưng chỉ cần lọc theo
+  // ĐÚNG 1 task vì trang luyện tập luôn chấm từng task riêng lẻ.
+  const resultHighlightItems: HighlightItem[] = useMemo(() => {
+    if (!result) return [];
+    return [
+      ...resolveTaskCorrections(result.feedback, result.taskType, result.essay).map((data) => ({
+        kind: "correction" as const,
+        data,
+      })),
+      ...resolveTaskEssayUpgrades(result.feedback, result.taskType).map((data) => ({
+        kind: "upgrade" as const,
+        data,
+      })),
+      ...resolveTaskAdvancedStructures(result.feedback, result.taskType).map((data) => ({
+        kind: "structure" as const,
+        data,
+      })),
+    ];
+  }, [result]);
+
   if (result) {
     return (
       <main className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6">
-        <div className="mx-auto flex max-w-3xl flex-col items-center gap-6">
+        <div className="mx-auto flex max-w-[96rem] flex-col items-center gap-6">
           <div className="text-center">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white">
               IELTS Writing Practice
@@ -173,14 +202,6 @@ export default function PracticeWriting() {
             <h1 className="mt-4 font-serif text-2xl font-bold text-slate-900">
               Kết quả chấm {TASK_META[result.taskType].label}
             </h1>
-          </div>
-
-          <div className="w-full">
-            <GradingResultPanel
-              feedback={result.feedback}
-              task1Answer={result.taskType === "task1" ? result.essay : undefined}
-              task2Answer={result.taskType === "task2" ? result.essay : undefined}
-            />
           </div>
 
           <button
@@ -191,6 +212,28 @@ export default function PracticeWriting() {
             <RotateCcw className="h-4 w-4" />
             Luyện tập bài khác
           </button>
+
+          {/* AI Examiner đặt ngoài cùng bên trái; bài làm + chi tiết phản hồi
+              bên phải — để xem lại nội dung đã viết và kết quả chấm cùng lúc,
+              không cần cuộn qua lại. */}
+          <div className="grid w-full items-start gap-6 lg:grid-cols-2">
+            <div className="lg:-mt-8">
+              <GradingResultPanel
+                feedback={result.feedback}
+                task1Answer={result.taskType === "task1" ? result.essay : undefined}
+                task2Answer={result.taskType === "task2" ? result.essay : undefined}
+                collapsible
+              />
+            </div>
+
+            <SubmissionContentPanel
+              taskLabel={TASK_META[result.taskType].label}
+              prompt={draft.prompt}
+              imageUrl={result.taskType === "task1" ? draft.imageDataUrl : null}
+              essay={result.essay}
+              highlightItems={resultHighlightItems}
+            />
+          </div>
         </div>
       </main>
     );

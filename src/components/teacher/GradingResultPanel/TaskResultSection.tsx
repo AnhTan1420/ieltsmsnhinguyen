@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, BookOpen, Image as ImageIcon, Type } from "lucide-react";
+import { useState } from "react";
+import { AlertTriangle, BookOpen, ChevronDown, ChevronUp, Image as ImageIcon, Type } from "lucide-react";
 import type { AdvancedStructure, BandProgression, Correction, EssayUpgrade, VocabularySuggestion } from "@/lib/types";
 import { formatBandScore } from "@/lib/grading/feedback-resolvers";
 import { countWords } from "@/lib/teacher/submission-utils";
@@ -23,6 +24,11 @@ type TaskResultSectionProps = {
   advancedStructures: AdvancedStructure[];
   essayUpgrades: EssayUpgrade[];
   legacyEditedEssay?: string;
+  // Khi true: mặc định THU GỌN, chỉ hiện tới hết "Chẩn đoán chuyên sâu" (trong
+  // ExaminerSummaryCard) — phần "Lỗi sai & Đề xuất sửa" (CorrectionsSection)
+  // và các phần mở rộng (TaskExtras) ẩn sau nút "Xem thêm". Optional, mặc định
+  // false để KHÔNG đổi hành vi hiện có ở /teacher (luôn hiện đầy đủ).
+  collapsible?: boolean;
 };
 
 // Toàn bộ khối kết quả của MỘT task: badge Task N + Band, thống kê số từ/số
@@ -43,9 +49,11 @@ export default function TaskResultSection({
   advancedStructures,
   essayUpgrades,
   legacyEditedEssay,
+  collapsible = false,
 }: TaskResultSectionProps) {
   const Icon = taskNumber === 1 ? ImageIcon : BookOpen;
   const validBands = criteria.map((c) => c.score).filter((n): n is number => typeof n === "number");
+  const [isExpanded, setIsExpanded] = useState(!collapsible);
 
   return (
     <div className="space-y-6">
@@ -98,16 +106,38 @@ export default function TaskResultSection({
 
       {summary && <ExaminerSummaryCard summary={summary} validBands={validBands} />}
 
-      <CorrectionsSection corrections={corrections} />
+      {collapsible && !isExpanded ? (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-slate-300 bg-white py-3 text-sm font-bold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-50"
+        >
+          Xem thêm <ChevronDown className="h-4 w-4" />
+        </button>
+      ) : (
+        <>
+          <CorrectionsSection corrections={corrections} />
 
-      <TaskExtras
-        goldenRule={goldenRule}
-        bandProgression={bandProgression}
-        vocabulary={vocabulary}
-        advancedStructures={advancedStructures}
-        essayUpgrades={essayUpgrades}
-        legacyEditedEssay={legacyEditedEssay}
-      />
+          <TaskExtras
+            goldenRule={goldenRule}
+            bandProgression={bandProgression}
+            vocabulary={vocabulary}
+            advancedStructures={advancedStructures}
+            essayUpgrades={essayUpgrades}
+            legacyEditedEssay={legacyEditedEssay}
+          />
+
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(false)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-slate-200 bg-white py-3 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+            >
+              Thu gọn <ChevronUp className="h-4 w-4" />
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
