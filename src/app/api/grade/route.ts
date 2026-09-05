@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { gradeSubmission } from "@/lib/grading";
+import { gradeSubmission, buildSingleTaskFeedback } from "@/lib/grading";
+import { computeTaskBand, roundIeltsBand, filterTrivialCorrections } from "@/lib/grading/normalize";
 import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
 import { requireAuth } from "@/lib/auth-server";
 
@@ -29,38 +30,10 @@ if (DEFAULT_BUDGET_MS > maxDuration * 1000 - SAFETY_MARGIN_MS) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────
-// Luôn tính lại "band" tổng của MỘT task từ chính 4 điểm tiêu chí, thay vì
-// tin trực tiếp field "band"/"overall_band" mà model tự trả — vì model đôi
-// khi tự mâu thuẫn (VD: chấm TA/CC/LR/GRA = 8,8,8,8 nhưng lại ghi "band 7.5"
-// ở đâu đó, hoặc field "band" lệch khỏi trung bình 4 tiêu chí nó vừa chấm).
-// Công thức làm tròn khớp CHÍNH XÁC quy tắc đã mô tả trong buildSystemPrompt:
-// .25 → làm tròn lên .5; .75 → làm tròn lên nguyên tiếp theo; .0/.5 giữ nguyên.
-// ─────────────────────────────────────────────────────────────
-function filterTrivialCorrections(corrections: any[]): any[] {
-  return (corrections || []).filter((c) => {
-    const original = String(c?.original ?? "").trim().toLowerCase();
-    const corrected = String(c?.corrected ?? "").trim().toLowerCase();
-    return original !== corrected && original.length > 0 && corrected.length > 0;
-  });
-}
-
-function roundIeltsBand(avg: number): number {
-  const rem = avg % 1;
-  if (Math.abs(rem - 0.25) < 1e-9) return Math.floor(avg) + 0.5;
-  if (Math.abs(rem - 0.75) < 1e-9) return Math.ceil(avg);
-  // .0 và .5 giữ nguyên; các phần dư khác gần như không xảy ra vì mỗi tiêu
-  // chí luôn là bội số 0.5, nhưng vẫn làm tròn an toàn về 0.5 gần nhất.
-  return Math.round(avg * 2) / 2;
-}
-
-function computeTaskBand(criteria: { criterionScore?: number; CC?: number; LR?: number; GRA?: number }): number | null {
-  const { criterionScore, CC, LR, GRA } = criteria;
-  const scores = [criterionScore, CC, LR, GRA];
-  if (scores.some((s) => typeof s !== "number" || Number.isNaN(s))) return null;
-  const avg = (scores as number[]).reduce((a, b) => a + b, 0) / 4;
-  return roundIeltsBand(avg);
-}
+// Các hàm computeTaskBand/roundIeltsBand/filterTrivialCorrections đã chuyển
+// sang src/lib/grading/normalize.ts (import phía trên) để dùng chung với
+// /api/practice/grade — route chấm bài luyện tập public mới, không auth,
+// không ghi Supabase, nhưng phải tính band THEO ĐÚNG CÙNG MỘT công thức.
 
 export async function POST(request: Request) {
   const auth = await requireAuth(request);
@@ -184,46 +157,10 @@ export async function POST(request: Request) {
       }
       const raw = (await gradeSubmission(content, testPrompt, taskType, task1ImageUrl, DEFAULT_BUDGET_MS)) as any;
 
-      const criterionKey = taskType === "task1" ? "TA" : "TR";
-      const criterionScore = raw.task1?.[criterionKey] ?? raw.task2?.[criterionKey] ?? raw[criterionKey];
-      const CC = raw.task1?.CC ?? raw.task2?.CC ?? raw.CC;
-      const LR = raw.task1?.LR ?? raw.task2?.LR ?? raw.LR;
-      const GRA = raw.task1?.GRA ?? raw.task2?.GRA ?? raw.GRA;
-
-      const computedBand = computeTaskBand({ criterionScore, CC, LR, GRA })
-        ?? Number(raw.task1?.band ?? raw.task2?.band ?? raw.overall_band ?? raw.band ?? 0);
-
-      const taskScoreObject = {
-        band: computedBand,
-        [criterionKey]: criterionScore,
-        CC,
-        LR,
-        GRA,
-      };
-
-      feedback = {
-        ...raw,
-        overall_band: computedBand,
-        corrections: filterTrivialCorrections(raw.corrections || []).map((c: any) => ({ ...c, task: taskType })),
-        vocabulary_suggestions: (raw.vocabulary_suggestions || []).map((v: any) => ({ ...v, task: taskType })),
-        advanced_structures: (raw.advanced_structures || []).map((s: any) => ({ ...s, task: taskType })),
-        essay_upgrades: (raw.essay_upgrades || []).map((u: any) => ({ ...u, task: taskType })),
-        task1: taskType === "task1" ? taskScoreObject : null,
-        task2: taskType === "task2" ? taskScoreObject : null,
-        ...(taskType === "task1"
-          ? {
-              task1_summary: raw.examiner_summary,
-              task1_golden_rule: raw.golden_rule,
-              task1_band_progression: raw.band_progression,
-              task1_edited_essay_markdown: raw.edited_essay_markdown,
-            }
-          : {
-              task2_summary: raw.examiner_summary,
-              task2_golden_rule: raw.golden_rule,
-              task2_band_progression: raw.band_progression,
-              task2_edited_essay_markdown: raw.edited_essay_markdown,
-            }),
-      };
+      // Chuẩn hoá (tự tính lại band từ 4 tiêu chí, lọc correction rỗng, gắn
+      // "task" vào từng gợi ý) — logic dùng chung với /api/practice/grade,
+      // xem src/lib/grading/normalize.ts.
+      feedback = buildSingleTaskFeedback(raw, taskType as "task1" | "task2");
     }
 
     const { error } = await getSupabaseAdmin()
