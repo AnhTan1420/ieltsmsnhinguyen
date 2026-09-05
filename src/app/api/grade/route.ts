@@ -1,10 +1,33 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { gradeSubmission } from "@/lib/grading";
+import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
 import { requireAuth } from "@/lib/auth-server";
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
+
+// ─────────────────────────────────────────────────────────────
+// SANITY CHECK — đồng bộ giữa `maxDuration` (trần cứng của Vercel, tính bằng
+// GIÂY) và `DEFAULT_BUDGET_MS` (ngân sách thời gian gradeSubmission() tự
+// đặt ra cho chính nó, tính bằng MILLISECOND, xem provider.ts).
+//
+// `maxDuration` bắt buộc phải là một literal số để Next.js đọc tĩnh lúc
+// build, nên KHÔNG thể tự động suy ra DEFAULT_BUDGET_MS từ nó — 2 con số này
+// phải được người sửa code tự tay giữ cho khớp. Warning dưới đây chỉ là một
+// lưới an toàn: nếu sau này ai đó hạ `maxDuration` (hoặc tăng
+// `DEFAULT_BUDGET_MS`) mà quên chỉnh số kia, sẽ thấy cảnh báo ngay trong log
+// thay vì chỉ phát hiện ra khi Vercel âm thầm kill request giữa chừng trên
+// production.
+// ─────────────────────────────────────────────────────────────
+const SAFETY_MARGIN_MS = 5_000; // đệm cho auth + parse request + ghi Supabase sau khi chấm xong
+if (DEFAULT_BUDGET_MS > maxDuration * 1000 - SAFETY_MARGIN_MS) {
+  console.warn(
+    `⚠️ [route/grade] DEFAULT_BUDGET_MS (${DEFAULT_BUDGET_MS}ms) quá sát hoặc vượt maxDuration ` +
+    `(${maxDuration}s = ${maxDuration * 1000}ms). Vercel có thể kill function giữa chừng trước khi ` +
+    `gradeSubmission() kịp tự trả lỗi thân thiện. Xem comment ở đầu provider.ts.`,
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // Luôn tính lại "band" tổng của MỘT task từ chính 4 điểm tiêu chí, thay vì
@@ -61,9 +84,14 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Missing task prompts for both tasks" }, { status: 400 });
       }
 
+      // Truyền tường minh DEFAULT_BUDGET_MS (thay vì để gradeSubmission() tự
+      // dùng default ngầm) — 2 lệnh gọi này chạy SONG SONG qua Promise.all,
+      // mỗi lệnh có ngân sách thời gian riêng nhưng cùng bắt đầu đếm gần như
+      // cùng lúc, nên tổng thời gian chờ thực tế vẫn bị chặn bởi budget này
+      // (không cộng dồn 2 lần), vẫn nằm trong maxDuration đã sanity-check ở trên.
       const [feedback1, feedback2] = await Promise.all([
-        gradeSubmission(content, task1Prompt, "task1", task1ImageUrl),
-        gradeSubmission(content, task2Prompt, "task2")
+        gradeSubmission(content, task1Prompt, "task1", task1ImageUrl, DEFAULT_BUDGET_MS),
+        gradeSubmission(content, task2Prompt, "task2", undefined, DEFAULT_BUDGET_MS)
       ]);
 
       const fb1 = feedback1 as any;
@@ -140,7 +168,7 @@ export async function POST(request: Request) {
       if (!testPrompt) {
         return NextResponse.json({ error: "Missing testPrompt" }, { status: 400 });
       }
-      const raw = (await gradeSubmission(content, testPrompt, taskType, task1ImageUrl)) as any;
+      const raw = (await gradeSubmission(content, testPrompt, taskType, task1ImageUrl, DEFAULT_BUDGET_MS)) as any;
 
       const criterionKey = taskType === "task1" ? "TA" : "TR";
       const criterionScore = raw.task1?.[criterionKey] ?? raw.task2?.[criterionKey] ?? raw[criterionKey];
@@ -203,7 +231,13 @@ export async function POST(request: Request) {
     const technicalDetail = error instanceof Error ? error.message : String(error);
     console.error("❌ GRADING FAILED:", technicalDetail);
 
-    const isAIOverload = /429|rate limit|quota|exceeded/i.test(technicalDetail);
+    // Mở rộng detection so với bản gốc (chỉ bắt "429|rate limit|quota|exceeded"):
+    // gradeSubmission() giờ có thể thất bại vì HẾT NGÂN SÁCH THỜI GIAN (timeout
+    // ở từng model, hoặc "Hết ngân sách thời gian..." khi deadline đã cạn trước
+    // khi kịp thử model nào) — về bản chất, với người dùng cuối đây VẪN là
+    // "hệ thống AI đang quá tải/chậm, thử lại sau", không phải lỗi hệ thống
+    // nghiêm trọng (502) như các lỗi thật khác (input sai, code lỗi...).
+    const isAIOverload = /429|rate limit|quota|exceeded|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(technicalDetail);
 
     return NextResponse.json(
       {

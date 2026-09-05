@@ -194,13 +194,36 @@ export function extractJson(raw: string, taskType: TaskType): GradingFeedback {
   }
 }
 
-/** Lỗi có nên fallback sang model/provider khác hay không (rate limit/quota/quá tải/JSON hỏng) */
+/**
+ * Lỗi có nên fallback sang model/provider khác hay không
+ * (rate limit / quota / quá tải / timeout / mất kết nối / JSON hỏng).
+ *
+ * QUAN TRỌNG — bug đã sửa: trước đây timeout/abort KHÔNG khớp bất kỳ điều
+ * kiện nào bên dưới, nên khi 1 model bị CHẬM (chứ không phải lỗi hẳn), lỗi bị
+ * throw thẳng ra ngoài thay vì thử model/provider kế tiếp trong chain — tức
+ * là hỏng đúng cái tình huống mà toàn bộ model-chain (70b→8b, Flash→Flash-
+ * Lite, Gemini→Groq) được dựng ra để chịu đựng. Đã verify trực tiếp trong
+ * source của 2 SDK đang dùng:
+ *  - groq-sdk: timeout (qua request option `{ timeout }`) ném
+ *    APIConnectionTimeoutError với message CHÍNH XÁC "Request timed out."
+ *  - @google/genai: timeout/abort (qua `httpOptions.timeout` hoặc
+ *    abortSignal) khiến fetch nội bộ ném DOMException tên "AbortError".
+ *
+ * Cũng bổ sung 500/502/504/408 — đây chính là các mã mà bản thân
+ * @google/genai coi là "retryable" ở tầng nội bộ (DEFAULT_RETRY_HTTP_STATUS_CODES
+ * trong SDK); nếu lỗi vẫn lọt ra tới tận đây nghĩa là SDK đã tự retry hết số
+ * lần cho phép và vẫn fail — đáng để thử sang model/provider khác, không nên
+ * bó tay ngay.
+ */
 export function isFallbackWorthyError(err: any): boolean {
   if (err instanceof JsonExtractionError) return true;
 
   const status = err?.status ?? err?.response?.status ?? err?.code;
-  if (status === 429 || status === 413 || status === 503) return true;
+  if ([429, 413, 503, 500, 502, 504, 408].includes(status)) return true;
   if (status === "RESOURCE_EXHAUSTED" || status === "UNAVAILABLE") return true;
+
+  // Timeout/abort — xem giải thích đầy đủ ở JSDoc phía trên.
+  if (err?.name === "AbortError") return true;
 
   const msg = String(err?.message ?? "").toLowerCase();
   return (
@@ -209,6 +232,12 @@ export function isFallbackWorthyError(err: any): boolean {
     msg.includes("too large") ||
     msg.includes("overloaded") ||
     msg.includes("resource_exhausted") ||
-    msg.includes("exceeded your current quota")
+    msg.includes("exceeded your current quota") ||
+    msg.includes("timed out") ||
+    msg.includes("timeout") ||
+    msg.includes("aborted") ||
+    msg.includes("econnreset") ||
+    msg.includes("econnrefused") ||
+    msg.includes("fetch failed")
   );
 }
