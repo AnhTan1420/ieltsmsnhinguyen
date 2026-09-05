@@ -23,12 +23,21 @@ export default function Home() {
           Hệ thống quản lý bài thi, theo dõi trực tiếp và chấm điểm tự động.
         </p>
         
-        <Link 
-          href="/teacher" 
-          className="mt-10 inline-block rounded-2xl bg-cyan-400 px-10 py-4 text-lg font-bold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.2)] transition-all hover:bg-cyan-300 hover:scale-105"
-        >
-          Mở Dashboard
-        </Link>
+        <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href="/teacher"
+            className="inline-block rounded-2xl bg-cyan-400 px-10 py-4 text-lg font-bold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.2)] transition-all hover:bg-cyan-300 hover:scale-105"
+          >
+            Mở Dashboard
+          </Link>
+
+          <Link
+            href="/practice"
+            className="inline-block rounded-2xl border border-slate-700 bg-slate-900/60 px-10 py-4 text-lg font-bold text-white transition-all hover:border-cyan-400/60 hover:bg-slate-900"
+          >
+            Luyện tập Writing
+          </Link>
+        </div>
       </div>
 
       

@@ -1,7 +1,8 @@
 "use client";
 
-import { ArrowLeft, BookOpen, Check, ClipboardX, Clock, Copy, GraduationCap, Image as ImageIcon, Loader2, Trash2, UploadCloud } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, ClipboardX, Clock, Copy, GraduationCap, Image as ImageIcon } from "lucide-react";
 import type { ClassRow, TestRow } from "@/lib/types";
+import ChartImageDropzone from "./ChartImageDropzone";
 
 type TestEditorFormProps = {
   editingTest: Partial<TestRow> | null;
@@ -14,7 +15,7 @@ type TestEditorFormProps = {
   onChange: (next: Partial<TestRow>) => void;
   onCancelEdit: () => void;
   onSubmit: (e: React.FormEvent) => void;
-  onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onImageUpload: (file: File) => void;
   onCopyLink: (testId: string) => void;
 };
 
@@ -145,32 +146,12 @@ export default function TestEditorForm({
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-2 uppercase tracking-wide">Ảnh Biểu đồ / Bản đồ</label>
-              {editingTest.image_url ? (
-                <div className="mb-2 relative w-full h-40 rounded-xl border border-slate-200 overflow-hidden bg-white group">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={editingTest.image_url} alt="Task 1" className="object-contain w-full h-full p-2" />
-                  <button
-                    type="button"
-                    onClick={() => onChange({ ...editingTest, image_url: null })}
-                    className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 hover:bg-red-600 shadow-lg transition-all"
-                    title="Xóa ảnh"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-slate-100 hover:border-cyan-300 bg-white border-slate-300 transition-all group">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-500 group-hover:text-cyan-600 transition-colors">
-                    {isUploading ? (
-                      <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
-                    ) : (
-                      <UploadCloud className="w-8 h-8 mb-2" />
-                    )}
-                    <p className="text-xs font-bold">{isUploading ? "Đang tải ảnh lên máy chủ..." : "Chạm để chọn ảnh từ thiết bị"}</p>
-                  </div>
-                  <input type="file" className="hidden" accept="image/png, image/jpeg" onChange={onImageUpload} disabled={isUploading} />
-                </label>
-              )}
+              <ChartImageDropzone
+                imageUrl={editingTest.image_url}
+                isUploading={isUploading}
+                onFileSelected={onImageUpload}
+                onRemove={() => onChange({ ...editingTest, image_url: null })}
+              />
             </div>
           </div>
 

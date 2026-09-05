@@ -1,6 +1,7 @@
 "use client";
 
-import { BookOpen, Bot, GraduationCap, LogOut, Radio } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Bot, GraduationCap, LogOut, PenLine, Radio } from "lucide-react";
 import { formatRelativeTime } from "@/lib/teacher/submission-utils";
 import type { RealtimeStatus } from "@/hooks/teacher/useSubmissions";
 
@@ -61,12 +62,26 @@ export default function DashboardHeader({
           </div>
         </div>
 
-        <button
-          onClick={onSignOut}
-          className="flex shrink-0 items-center gap-1.5 rounded-xl border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs font-bold text-red-400 transition-colors hover:text-red-300 sm:px-4 sm:text-sm"
-        >
-          <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Đăng xuất</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Mở ở tab mới — /practice là route public độc lập, không thuộc
+              state điều hướng (activeTab) của dashboard, tránh mất ngữ cảnh
+              đang xem dở của giáo viên. */}
+          <Link
+            href="/practice"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-800/50 bg-cyan-950/30 px-3 py-2 text-xs font-bold text-cyan-400 transition-colors hover:text-cyan-300 sm:px-4 sm:text-sm"
+          >
+            <PenLine className="h-4 w-4" /> <span className="hidden sm:inline">Trang luyện tập</span>
+          </Link>
+
+          <button
+            onClick={onSignOut}
+            className="flex items-center gap-1.5 rounded-xl border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs font-bold text-red-400 transition-colors hover:text-red-300 sm:px-4 sm:text-sm"
+          >
+            <LogOut className="h-4 w-4" /> <span className="hidden sm:inline">Đăng xuất</span>
+          </button>
+        </div>
       </div>
 
       {/* Tab strip — full-bleed, chia đều 2 nút trên mobile để dễ bấm bằng ngón cái */}

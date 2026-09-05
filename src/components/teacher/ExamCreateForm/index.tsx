@@ -37,9 +37,11 @@ export default function ExamCreateForm({ onError }: ExamCreateFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !editingTest) return;
+  // Nhận thẳng File (không phải ChangeEvent) — để dùng chung được với
+  // ChartImageDropzone (hỗ trợ cả bấm-chọn lẫn kéo-thả), component này chỉ lo
+  // "file được chọn xong rồi", không quan tâm chọn bằng cách nào.
+  const handleImageUpload = async (file: File) => {
+    if (!editingTest) return;
 
     setIsUploading(true);
 

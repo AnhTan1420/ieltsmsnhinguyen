@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Loader2, RotateCcw, Sparkles } from "lucide-react";
 import type { GradingFeedback } from "@/lib/types";
 import { TASK1_MIN_WORDS, TASK2_MIN_WORDS, countWords } from "@/lib/student-test-utils";
-import StudentResultPanel from "@/components/test/StudentResultPanel";
+import GradingResultPanel from "@/components/teacher/GradingResultPanel";
+import GradingProgressModal, { GRADING_STEPS } from "@/components/teacher/GradingProgressModal";
+import ChartImageDropzone from "@/components/teacher/ExamCreateForm/ChartImageDropzone";
 
 type TaskType = "task1" | "task2";
-type Draft = { prompt: string; essay: string };
+type Draft = { prompt: string; essay: string; imageDataUrl: string | null };
 
 const TASK_META: Record<
   TaskType,
@@ -29,21 +31,54 @@ const TASK_META: Record<
 };
 
 const EMPTY_DRAFTS: Record<TaskType, Draft> = {
-  task1: { prompt: "", essay: "" },
-  task2: { prompt: "", essay: "" },
+  task1: { prompt: "", essay: "", imageDataUrl: null },
+  task2: { prompt: "", essay: "", imageDataUrl: null },
 };
+
+// Ảnh biểu đồ tối đa ~6MB trước khi đọc thành base64 — nới rộng hơn giới hạn
+// MAX_IMAGE_DATA_URL_LENGTH ở /api/practice/grade một chút để trừ hao phần
+// "data:image/...;base64," + tỉ lệ phình ~33% của base64, chặn sớm ngay trên
+// trình duyệt thay vì để người dùng chờ round-trip lên server rồi mới báo lỗi.
+const MAX_IMAGE_FILE_BYTES = 6 * 1024 * 1024;
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error("Không đọc được tệp ảnh."));
+    reader.readAsDataURL(file);
+  });
+}
 
 // Trang luyện tập PUBLIC: khác với StudentTest (bài thi thật, có timer, chống
 // gian lận, lưu Supabase), component này KHÔNG lưu trữ gì cả — mỗi lượt chấm
 // là một request độc lập tới /api/practice/grade, kết quả chỉ tồn tại trên
 // state của trình duyệt. Người dùng rời trang là mất, đúng tinh thần "luyện
 // tập nháp" chứ không phải một bài thi được ghi nhận.
+//
+// Ảnh biểu đồ Task 1: dùng lại NGUYÊN component kéo-thả ChartImageDropzone từ
+// khu vực "Quản lý đề thi" ở /teacher, nhưng KHÔNG upload lên Supabase Storage
+// (route public này không có quyền, và người luyện tập không có tài khoản) —
+// thay vào đó đọc file thành base64 "data:" URL ngay trên trình duyệt rồi gửi
+// thẳng lên /api/practice/grade (xem comment ở route đó).
+//
+// Kết quả chấm: dùng lại NGUYÊN GradingResultPanel — panel "Đánh giá từ AI
+// Examiner" đầy đủ (lỗi sai chi tiết, nâng cấp câu, từ vựng, cấu trúc nâng
+// cao, lộ trình lên band...) vốn đang hiển thị ở tab "Theo dõi & Chấm bài"
+// của giáo viên — thay vì bản StudentResultPanel rút gọn (chỉ có điểm +
+// nhận xét ngắn) mà trang học sinh xem lại bài thi thật đang dùng. Cả 2 panel
+// đều là component thuần (không đọc DB/session), chỉ cần đúng shape
+// GradingFeedback, nên tái dùng được thẳng ở đây.
 export default function PracticeWriting() {
   const [taskType, setTaskType] = useState<TaskType>("task2");
   const [drafts, setDrafts] = useState<Record<TaskType, Draft>>(EMPTY_DRAFTS);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReadingImage, setIsReadingImage] = useState(false);
+  const [gradingStep, setGradingStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ taskType: TaskType; feedback: GradingFeedback } | null>(null);
+  const [result, setResult] = useState<{ taskType: TaskType; feedback: GradingFeedback; essay: string } | null>(
+    null,
+  );
 
   const meta = TASK_META[taskType];
   const draft = drafts[taskType];
@@ -53,8 +88,39 @@ export default function PracticeWriting() {
 
   const canSubmit = draft.prompt.trim().length > 0 && draft.essay.trim().length > 0 && !isSubmitting;
 
+  // Mô phỏng tiến trình chấm điểm ở phía client, giống hệt useSubmissions()
+  // bên /teacher (backend không stream tiến độ thật) — mỗi bước hiển thị ~3
+  // giây, dừng lại ở bước cuối để chờ kết quả thật từ server.
+  useEffect(() => {
+    if (!isSubmitting) {
+      setGradingStep(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setGradingStep((prev) => (prev < GRADING_STEPS.length - 1 ? prev + 1 : prev));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [isSubmitting]);
+
   function updateDraft(patch: Partial<Draft>) {
     setDrafts((prev) => ({ ...prev, [taskType]: { ...prev[taskType], ...patch } }));
+  }
+
+  async function handleChartFileSelected(file: File) {
+    if (file.size > MAX_IMAGE_FILE_BYTES) {
+      setError("Ảnh biểu đồ quá lớn (tối đa 6MB), vui lòng chọn ảnh nhẹ hơn.");
+      return;
+    }
+    setError(null);
+    setIsReadingImage(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      updateDraft({ imageDataUrl: dataUrl });
+    } catch {
+      setError("Không đọc được tệp ảnh, vui lòng thử lại.");
+    } finally {
+      setIsReadingImage(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -72,6 +138,7 @@ export default function PracticeWriting() {
           taskType,
           prompt: draft.prompt.trim(),
           essay: draft.essay.trim(),
+          ...(taskType === "task1" && draft.imageDataUrl ? { task1ImageUrl: draft.imageDataUrl } : {}),
         }),
       });
 
@@ -82,7 +149,7 @@ export default function PracticeWriting() {
         return;
       }
 
-      setResult({ taskType, feedback: data as GradingFeedback });
+      setResult({ taskType, feedback: data as GradingFeedback, essay: draft.essay.trim() });
     } catch {
       setError("Không thể kết nối tới máy chủ. Vui lòng kiểm tra mạng và thử lại.");
     } finally {
@@ -108,7 +175,13 @@ export default function PracticeWriting() {
             </h1>
           </div>
 
-          <StudentResultPanel feedback={result.feedback} />
+          <div className="w-full">
+            <GradingResultPanel
+              feedback={result.feedback}
+              task1Answer={result.taskType === "task1" ? result.essay : undefined}
+              task2Answer={result.taskType === "task2" ? result.essay : undefined}
+            />
+          </div>
 
           <button
             type="button"
@@ -176,6 +249,22 @@ export default function PracticeWriting() {
               />
             </div>
 
+            {taskType === "task1" && (
+              <div>
+                <label className="mb-1.5 block text-sm font-semibold text-slate-700">
+                  ẢNH BIỂU ĐỒ / BẢN ĐỒ
+                </label>
+                <ChartImageDropzone
+                  imageUrl={draft.imageDataUrl}
+                  isUploading={isReadingImage}
+                  onFileSelected={handleChartFileSelected}
+                  onRemove={() => updateDraft({ imageDataUrl: null })}
+                  onInvalidFile={(message) => setError(message)}
+                  hint="AI sẽ đối chiếu số liệu bạn viết với ảnh này khi chấm điểm."
+                />
+              </div>
+            )}
+
             <div>
               <label htmlFor="practice-essay" className="mb-1.5 block text-sm font-semibold text-slate-700">
                 Bài làm của bạn
@@ -236,6 +325,8 @@ export default function PracticeWriting() {
           </form>
         </div>
       </div>
+
+      <GradingProgressModal isGrading={isSubmitting} gradingStep={gradingStep} />
     </main>
   );
 }

@@ -24,6 +24,17 @@ import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
 // Đây cũng là lựa chọn an toàn hơn — route public không nên có quyền ghi
 // thẳng vào bảng `submissions` (vốn đang dùng service-role key) mà không qua
 // bất kỳ input nào được xác thực trước.
+//
+// ẢNH BIỂU ĐỒ TASK 1 (task1ImageUrl, thêm sau bản đầu): vì route này KHÔNG
+// auth và người luyện tập không có tài khoản, ta KHÔNG dùng Supabase Storage
+// (bucket "test-images" chỉ cho phép giáo viên đã đăng nhập upload) — thay
+// vào đó FE tự đọc file ảnh thành base64 "data:" URL ngay trên trình duyệt
+// (xem ChartImageDropzone + PracticeWriting.tsx) và gửi thẳng chuỗi đó lên
+// đây. gradeSubmission() ở dưới gọi fetch(task1ImageUrl) để lấy inline data
+// cho Gemini — fetch() của Node/undici đọc được cả "data:" URL lẫn URL http(s)
+// thật, nên không cần đổi gì ở tầng provider.ts. Giới hạn độ dài chuỗi bên
+// dưới (MAX_IMAGE_DATA_URL_LENGTH) để chặn payload ảnh khổng lồ làm tốn phí
+// AI/băng thông một cách vô lý trên route public không auth này.
 // ─────────────────────────────────────────────────────────────
 
 export const maxDuration = 60;
@@ -48,6 +59,12 @@ type PracticeTaskType = (typeof VALID_TASK_TYPES)[number];
 const MAX_PROMPT_LENGTH = 3_000;
 const MAX_ESSAY_LENGTH = 12_000;
 const MIN_ESSAY_LENGTH = 20;
+
+// ~5.5MB ảnh gốc sau khi base64 encode (base64 phình ~33%) — đủ rộng cho ảnh
+// chụp/export biểu đồ thông thường, vẫn chặn được payload bất thường. Đây
+// cũng là base64 DATA URL (đã gồm phần "data:image/...;base64," ở đầu), nên
+// giới hạn ký tự thô ở đây, không phải giới hạn dung lượng file nhị phân.
+const MAX_IMAGE_DATA_URL_LENGTH = 7_500_000;
 
 // ─────────────────────────────────────────────────────────────
 // Rate limit THÔ theo IP, lưu trong bộ nhớ của chính process Node đang chạy.
@@ -117,6 +134,9 @@ export async function POST(request: Request) {
   const taskType = body?.taskType;
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   const essay = typeof body?.essay === "string" ? body.essay.trim() : "";
+  // Chỉ có ý nghĩa với Task 1 — Task 2 không có ảnh biểu đồ/bản đồ nào để đối
+  // chiếu, nên nếu client lỡ gửi kèm khi taskType = "task2" thì bỏ qua ở dưới.
+  const rawTask1ImageUrl = typeof body?.task1ImageUrl === "string" ? body.task1ImageUrl.trim() : "";
 
   if (!VALID_TASK_TYPES.includes(taskType)) {
     return NextResponse.json({ error: "taskType phải là 'task1' hoặc 'task2'." }, { status: 400 });
@@ -146,16 +166,35 @@ export async function POST(request: Request) {
     );
   }
 
+  // Chỉ chấp nhận ảnh khi đang chấm Task 1 — validate CHẶT vì đây là input
+  // do người dùng ẩn danh tự gửi thẳng lên (không đi qua Supabase Storage như
+  // /teacher, không có bước server nào kiểm tra loại file trước đó).
+  let task1ImageUrl: string | undefined;
+  if (rawTask1ImageUrl && taskType === "task1") {
+    if (rawTask1ImageUrl.length > MAX_IMAGE_DATA_URL_LENGTH) {
+      return NextResponse.json({ error: "Ảnh biểu đồ quá lớn, vui lòng chọn ảnh nhẹ hơn." }, { status: 400 });
+    }
+    if (!/^data:image\/(png|jpe?g|webp|gif);base64,/i.test(rawTask1ImageUrl)) {
+      return NextResponse.json(
+        { error: "Ảnh biểu đồ không hợp lệ. Vui lòng chọn lại tệp ảnh (PNG, JPG, WEBP)." },
+        { status: 400 },
+      );
+    }
+    task1ImageUrl = rawTask1ImageUrl;
+  }
+
   try {
     // Tái sử dụng NGUYÊN VẸN AI Agent đang dùng cho bài thi thật — cùng model
     // chain (Gemini → Groq fallback), cùng prompt chấm điểm chuẩn IELTS, cùng
-    // ngân sách thời gian. Không truyền task1ImageUrl: trang luyện tập hiện
-    // chỉ nhận đề bài dạng văn bản, không có upload ảnh biểu đồ cho Task 1.
+    // ngân sách thời gian. task1ImageUrl (nếu có, đã validate ở trên) là ảnh
+    // biểu đồ/bản đồ Task 1 học sinh tự kéo-thả/chọn trên trang luyện tập —
+    // được gửi dưới dạng base64 "data:" URL vì route này không auth nên không
+    // upload qua Supabase Storage như /teacher (xem comment đầu file).
     const raw = (await gradeSubmission(
       essay,
       prompt,
       taskType as PracticeTaskType,
-      undefined,
+      task1ImageUrl,
       DEFAULT_BUDGET_MS,
     )) as any;
 
