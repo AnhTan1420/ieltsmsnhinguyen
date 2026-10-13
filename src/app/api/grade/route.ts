@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { gradeSubmission, buildSingleTaskFeedback } from "@/lib/grading";
+import { gradeSubmission, buildSingleTaskFeedback, isAIOverloadError } from "@/lib/grading";
 import { computeTaskBand, roundIeltsBand, filterTrivialCorrections } from "@/lib/grading/normalize";
 import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
 import { requireAuth } from "@/lib/auth-server";
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
     // khi kịp thử model nào) — về bản chất, với người dùng cuối đây VẪN là
     // "hệ thống AI đang quá tải/chậm, thử lại sau", không phải lỗi hệ thống
     // nghiêm trọng (502) như các lỗi thật khác (input sai, code lỗi...).
-    const isAIOverload = /429|rate limit|quota|exceeded|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(technicalDetail);
+    const isAIOverload = isAIOverloadError(error);
 
     return NextResponse.json(
       {

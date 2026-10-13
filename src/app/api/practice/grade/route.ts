@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { gradeSubmission, buildSingleTaskFeedback } from "@/lib/grading";
+import { gradeSubmission, buildSingleTaskFeedback, isAIOverloadError } from "@/lib/grading";
 import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
 
 // ─────────────────────────────────────────────────────────────
@@ -207,9 +207,7 @@ export async function POST(request: Request) {
     const technicalDetail = error instanceof Error ? error.message : String(error);
     console.error("❌ [practice-grade] GRADING FAILED:", technicalDetail);
 
-    const isAIOverload = /429|rate limit|quota|exceeded|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(
-      technicalDetail,
-    );
+    const isAIOverload = isAIOverloadError(error);
 
     return NextResponse.json(
       {

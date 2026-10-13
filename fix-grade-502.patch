@@ -1,0 +1,354 @@
+diff -ruN a/src/app/api/grade/route.ts ieltsmsnhinguyen-main/src/app/api/grade/route.ts
+--- a/src/app/api/grade/route.ts	2026-10-13 12:44:05.000000000 +0000
++++ b/src/app/api/grade/route.ts	2026-10-13 14:05:53.811292888 +0000
+@@ -1,6 +1,6 @@
+ import { NextResponse } from "next/server";
+ import { getSupabaseAdmin } from "@/lib/supabase-admin";
+-import { gradeSubmission, buildSingleTaskFeedback } from "@/lib/grading";
++import { gradeSubmission, buildSingleTaskFeedback, isAIOverloadError } from "@/lib/grading";
+ import { computeTaskBand, roundIeltsBand, filterTrivialCorrections } from "@/lib/grading/normalize";
+ import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
+ import { requireAuth } from "@/lib/auth-server";
+@@ -188,7 +188,7 @@
+     // khi kịp thử model nào) — về bản chất, với người dùng cuối đây VẪN là
+     // "hệ thống AI đang quá tải/chậm, thử lại sau", không phải lỗi hệ thống
+     // nghiêm trọng (502) như các lỗi thật khác (input sai, code lỗi...).
+-    const isAIOverload = /429|rate limit|quota|exceeded|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(technicalDetail);
++    const isAIOverload = isAIOverloadError(error);
+ 
+     return NextResponse.json(
+       {
+diff -ruN a/src/app/api/practice/grade/route.ts ieltsmsnhinguyen-main/src/app/api/practice/grade/route.ts
+--- a/src/app/api/practice/grade/route.ts	2026-10-13 12:44:05.000000000 +0000
++++ b/src/app/api/practice/grade/route.ts	2026-10-13 14:05:53.811994836 +0000
+@@ -1,5 +1,5 @@
+ import { NextResponse } from "next/server";
+-import { gradeSubmission, buildSingleTaskFeedback } from "@/lib/grading";
++import { gradeSubmission, buildSingleTaskFeedback, isAIOverloadError } from "@/lib/grading";
+ import { DEFAULT_BUDGET_MS } from "@/lib/grading/provider";
+ 
+ // ─────────────────────────────────────────────────────────────
+@@ -207,9 +207,7 @@
+     const technicalDetail = error instanceof Error ? error.message : String(error);
+     console.error("❌ [practice-grade] GRADING FAILED:", technicalDetail);
+ 
+-    const isAIOverload = /429|rate limit|quota|exceeded|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(
+-      technicalDetail,
+-    );
++    const isAIOverload = isAIOverloadError(error);
+ 
+     return NextResponse.json(
+       {
+diff -ruN a/src/lib/grading/index.ts ieltsmsnhinguyen-main/src/lib/grading/index.ts
+--- a/src/lib/grading/index.ts	2026-10-13 12:44:05.000000000 +0000
++++ b/src/lib/grading/index.ts	2026-10-13 14:05:05.803060275 +0000
+@@ -9,3 +9,5 @@
+   roundIeltsBand,
+   filterTrivialCorrections,
+ } from "./normalize";
++
++export { AllProvidersFailedError, isAIOverloadError } from "./parse";
+diff -ruN a/src/lib/grading/parse.ts ieltsmsnhinguyen-main/src/lib/grading/parse.ts
+--- a/src/lib/grading/parse.ts	2026-10-13 12:44:05.000000000 +0000
++++ b/src/lib/grading/parse.ts	2026-10-13 14:05:05.802736826 +0000
+@@ -76,7 +76,45 @@
+ // ─────────────────────────────────────────────────────────────
+ 
+ /** JSON không parse được sau mọi nỗ lực sửa — coi là lỗi "đáng thử model khác", không phải lỗi hệ thống */
+-export class JsonExtractionError extends Error { }
++export class JsonExtractionError extends Error {
++  constructor(message: string) {
++    super(message);
++    this.name = "JsonExtractionError";
++  }
++}
++
++/**
++ * Ném ra khi CẢ Gemini lẫn Groq đều thất bại. Là lỗi có kiểu (typed) để route
++ * phân loại 503 (AI quá tải/hết lượt — thử lại sau được) vs 502 (lỗi hệ thống
++ * thật) bằng `instanceof` thay vì regex trên chuỗi message: regex cũ không
++ * khớp "high demand"/"UNAVAILABLE"/"json_validate_failed" nên một sự cố quá
++ * tải thuần tuý của AI bị trả nhầm thành 502 "lỗi hệ thống nghiêm trọng".
++ */
++export class AllProvidersFailedError extends Error {
++  readonly geminiError: unknown;
++  readonly groqError: unknown;
++  constructor(message: string, geminiError: unknown, groqError: unknown) {
++    super(message);
++    this.name = "AllProvidersFailedError";
++    this.geminiError = geminiError;
++    this.groqError = groqError;
++  }
++}
++
++/** 503 / UNAVAILABLE / "high demand" — quá tải tạm thời phía provider, hay tự hết sau vài giây. */
++export function isOverloadError(err: any): boolean {
++  const status = err?.status ?? err?.response?.status ?? err?.code;
++  if (status === 503 || status === "UNAVAILABLE") return true;
++  const msg = String(err?.message ?? "").toLowerCase();
++  return msg.includes("unavailable") || msg.includes("high demand") || msg.includes("overloaded");
++}
++
++/** Lỗi nào của AI đáng trả 503 "thử lại sau" cho người dùng (thay vì 502 lỗi hệ thống). */
++export function isAIOverloadError(err: unknown): boolean {
++  if (err instanceof AllProvidersFailedError) return true;
++  const msg = err instanceof Error ? err.message : String(err);
++  return /429|503|413|rate limit|quota|exceeded|unavailable|high demand|overloaded|too large|json_validate_failed|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(msg);
++}
+ 
+ function toHalfBand(x: number): number {
+   return Math.round(Math.min(Math.max(x, 1), 9) * 2) / 2;
+@@ -230,6 +268,12 @@
+ 
+   const msg = String(err?.message ?? "").toLowerCase();
+   return (
++    // Groq 400 `json_validate_failed`: model (đặc biệt gpt-oss — reasoning model)
++    // tiêu hết max_tokens cho phần suy luận ẩn nên content rỗng/cụt → Groq tự
++    // validate JSON và từ chối. Đây là lỗi RIÊNG CỦA MODEL/lượt gọi, không phải
++    // lỗi input của mình → phải được phép thử model/provider khác, không throw.
++    msg.includes("json_validate_failed") ||
++    msg.includes("failed to validate json") ||
+     msg.includes("rate_limit") ||
+     msg.includes("quota") ||
+     msg.includes("too large") ||
+diff -ruN a/src/lib/grading/provider.ts ieltsmsnhinguyen-main/src/lib/grading/provider.ts
+--- a/src/lib/grading/provider.ts	2026-10-13 12:44:05.000000000 +0000
++++ b/src/lib/grading/provider.ts	2026-10-13 14:05:46.400179869 +0000
+@@ -4,7 +4,13 @@
+ import type { TaskType, PromptMode } from "./prompt";
+ import { buildSystemPrompt } from "./prompt";
+ import { buildGradingJsonSchema } from "./schema";
+-import { extractJson, isFallbackWorthyError, JsonExtractionError } from "./parse";
++import {
++  extractJson,
++  isFallbackWorthyError,
++  isOverloadError,
++  JsonExtractionError,
++  AllProvidersFailedError,
++} from "./parse";
+ 
+ // ─────────────────────────────────────────────────────────────
+ // CẤU HÌNH MODEL CHAIN CHUNG
+@@ -14,6 +20,8 @@
+   readonly maxTokens: number;
+   readonly mode: PromptMode;
+   readonly timeoutMs: number;
++  /** Chỉ Groq gpt-oss (reasoning model): mức suy luận ẩn. "low" để không ngốn hết token output. */
++  readonly reasoningEffort?: "low" | "medium" | "high";
+ }
+ 
+ // ─────────────────────────────────────────────────────────────
+@@ -126,6 +134,10 @@
+ function isRateLimitError(err: any): boolean {
+   const status = err?.status ?? err?.response?.status ?? err?.code;
+   if (status === 429) return true;
++  // 413 "Request too large ... TPM limit" của Groq: request VƯỢT HẲN trần token/phút
++  // của tier → đợi bao lâu cũng không qua. Body lỗi lại mang code "rate_limit_exceeded"
++  // nên check msg bên dưới sẽ nhầm nó là 429 và retry vô ích → loại trừ tường minh.
++  if (status === 413) return false;
+   const msg = String(err?.message ?? "").toLowerCase();
+   return (
+     msg.includes("429") ||
+@@ -188,8 +200,46 @@
+   return null;
+ }
+ 
++/**
++ * Groq báo thời gian chờ ở header `retry-after` (giây) hoặc trong message:
++ * "Please try again in 1.234s" / "in 460ms" / "in 2m3.5s". Dùng con số THẬT này
++ * thay vì đoán 1.5s cố định. Trả null nếu không có.
++ */
++function extractGroqRetryDelayMs(err: any): number | null {
++  const headerVal = err?.headers?.["retry-after"] ?? err?.headers?.get?.("retry-after");
++  const headerSec = parseFloat(String(headerVal ?? ""));
++  if (Number.isFinite(headerSec)) return Math.ceil(headerSec * 1000);
++
++  const m = String(err?.message ?? "").match(/try again in\s+(?:(\d+)m)?\s*([\d.]+)(ms|s)/i);
++  if (!m) return null;
++  const minutes = m[1] ? parseInt(m[1], 10) : 0;
++  const value = parseFloat(m[2]);
++  if (!Number.isFinite(value)) return null;
++  const ms = m[3].toLowerCase() === "ms" ? value : value * 1000;
++  return Math.ceil(minutes * 60_000 + ms);
++}
++
++/**
++ * Ước lượng thô số token của 1 request (tiếng Việt token hoá rất "đắt": ~2.5 ký
++ * tự/token). Chỉ dùng để PRE-FLIGHT chặn request chắc chắn vượt TPM của Groq.
++ */
++function estimateTokens(text: string): number {
++  return Math.ceil(text.length / 2.5);
++}
++
++/**
++ * Trần token/phút (input + max output) của tier Groq đang dùng. Free tier của
++ * openai/gpt-oss-120b & 20b là 8000 TPM. Groq tính GIỮ CHỖ cả max_tokens vào
++ * con số này, nên request "to" bị 413 ngay dù chưa sinh ra chữ nào. Nâng bằng env
++ * GROQ_TPM_LIMIT khi lên tier trả phí.
++ */
++const GROQ_TPM_LIMIT = Number(process.env.GROQ_TPM_LIMIT ?? 8_000);
++
+ /** Số lần thử LẠI TRÊN CÙNG 1 MODEL khi gặp 429 (chưa tính lượt gọi đầu tiên). */
+ const RATE_LIMIT_MAX_RETRIES = 2;
++/** Số lần retry ngắn trên cùng model khi gặp 503 quá tải tạm thời (chỉ Gemini). */
++const OVERLOAD_MAX_RETRIES = 1;
++const OVERLOAD_RETRY_DELAY_MS = 2_000;
+ /** Thời gian đợi giữa các lần thử lại khi gặp 429 — đủ để qua cơn burst limit theo giây, không đủ dài để ăn hết ngân sách chung. */
+ const RATE_LIMIT_RETRY_DELAY_MS = 1_500;
+ 
+@@ -206,17 +256,28 @@
+ //   - llama-3.1-8b-instant    → openai/gpt-oss-20b
+ // ─────────────────────────────────────────────────────────────
+ const GROQ_MODEL_CHAIN: readonly ModelChainConfig[] = Object.freeze([
++  // FIX gốc rễ (log 13/10/2026: 429,429 → 413 trên 120b, rồi 400 json_validate_failed
++  // với failed_generation "" trên 20b):
++  //  - 120b trước đây dùng mode "full": system prompt task2 ≈ 8.7k token + bài viết
++  //    + 3500 token output ≈ 13k ≫ 8k TPM free tier → 413 là CHẮC CHẮN, không phải
++  //    sự cố ngẫu nhiên. Dùng "minimal" (~0.9k token) để request thực sự vừa trần.
++  //  - 20b trước đây max_tokens 1500: gpt-oss là reasoning model, token suy luận ẨN
++  //    cũng tính vào max_tokens → hết sạch trước khi viết được ký tự JSON nào →
++  //    content rỗng → Groq trả 400 json_validate_failed (failed_generation: "").
++  //    Nâng ngân sách output + reasoning_effort "low" để dành chỗ cho JSON thật.
+   {
+     model: process.env.GROQ_MODEL ?? "openai/gpt-oss-120b",
+     maxTokens: 3500,
+-    mode: "full",
++    mode: "minimal",
+     timeoutMs: 20_000, // 20s — sẽ bị clamp nếu ngân sách chung còn ít hơn
++    reasoningEffort: "low",
+   },
+   {
+     model: "openai/gpt-oss-20b",
+-    maxTokens: 1500,
++    maxTokens: 3000,
+     mode: "minimal",
+-    timeoutMs: 10_000, // 10s
++    timeoutMs: 12_000,
++    reasoningEffort: "low",
+   },
+ ]);
+ 
+@@ -231,9 +292,21 @@
+ 
+   let lastError: any = new Error("[groq] Hết ngân sách thời gian trước khi thử được model nào.");
+ 
+-  for (const { model, maxTokens, mode, timeoutMs } of GROQ_MODEL_CHAIN) {
++  for (const { model, maxTokens, mode, timeoutMs, reasoningEffort } of GROQ_MODEL_CHAIN) {
+     let retriesLeft = RATE_LIMIT_MAX_RETRIES;
+ 
++    // PRE-FLIGHT: request chắc chắn vượt TPM thì đừng gọi (tốn 1 lượt + dễ kéo theo 429
++    // cho lượt sau do chiếm bucket). Bỏ qua model này, sang model kế tiếp.
++    const preflightPrompt = buildSystemPrompt(taskType, { mode });
++    const estimated = estimateTokens(preflightPrompt + userContent) + maxTokens;
++    if (estimated > GROQ_TPM_LIMIT) {
++      lastError = new Error(
++        `[groq] Request ước ~${estimated} token vượt trần TPM ${GROQ_TPM_LIMIT} của ${model} — bỏ qua (too large).`,
++      );
++      console.warn(`⚠️ [groq/${taskType}] ${(lastError as Error).message}`);
++      continue;
++    }
++
+     // eslint-disable-next-line no-constant-condition
+     while (true) {
+       const attemptTimeout = clampAttemptTimeout(deadline, timeoutMs);
+@@ -252,13 +325,16 @@
+           {
+             model,
+             temperature: 0.2,
+-            max_tokens: maxTokens,
++            // max_completion_tokens (tên mới, thay max_tokens) — với gpt-oss đây là trần
++            // CHUNG cho cả reasoning ẩn lẫn JSON hiển thị.
++            max_completion_tokens: maxTokens,
++            ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+             response_format: { type: "json_object" },
+             messages: [
+               { role: "system", content: systemPrompt },
+               { role: "user", content: userContent },
+             ],
+-          },
++          } as any,
+           // groq-sdk hỗ trợ timeout NATIVE ở tầng request options: nó tự gắn
+           // AbortSignal và hủy THẬT request khi hết giờ (đã verify trong
+           // node_modules/groq-sdk/internal/request-options.d.ts).
+@@ -273,14 +349,14 @@
+ 
+         // 429 còn lượt retry & còn đủ ngân sách để đợi + gọi lại → thử lại CÙNG model.
+         if (retriesLeft > 0 && isRateLimitError(err)) {
+-          const suggestedMs = extractGoogleRetryDelayMs(err);
++          const suggestedMs = extractGroqRetryDelayMs(err);
+           const waitMs = suggestedMs !== null ? Math.max(suggestedMs, RATE_LIMIT_RETRY_DELAY_MS) : RATE_LIMIT_RETRY_DELAY_MS;
+           const stillViable = clampAttemptTimeout(deadline, waitMs + MIN_VIABLE_ATTEMPT_MS) !== null;
+ 
+           if (stillViable) {
+             retriesLeft -= 1;
+             console.warn(
+-              `⚠️ [groq/${taskType}] Model ${model} bị rate limit (429), đợi ${waitMs}ms${suggestedMs !== null ? " (theo retryDelay)" : ""} rồi thử lại cùng model...`,
++              `⚠️ [groq/${taskType}] Model ${model} bị rate limit (429), đợi ${waitMs}ms${suggestedMs !== null ? " (theo retry-after của Groq)" : ""} rồi thử lại cùng model...`,
+             );
+             await sleep(waitMs);
+             continue;
+@@ -314,6 +390,20 @@
+     mode: "compact",
+     timeoutMs: 10_000, // 10s
+   },
++  // Model thứ 3 thuộc HỌ KHÁC (pool capacity riêng). Log 13/10/2026: cả
++  // 3.5-flash lẫn 3.5-flash-lite đều 503 cùng lúc — cùng họ 3.5 nên cùng chịu 1 đợt
++  // quá tải. Thêm 1 model họ khác làm lưới an toàn trước khi rớt xuống Groq (vốn yếu
++  // hơn nhiều về chất lượng chấm). Đổi/tắt qua GEMINI_FALLBACK_MODEL ("" = tắt).
++  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash")
++    ? [
++        {
++          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash",
++          maxTokens: 4096,
++          mode: "compact" as const,
++          timeoutMs: 15_000,
++        },
++      ]
++    : []),
+ ]);
+ 
+ function guessImageMimeType(url: string): string {
+@@ -387,6 +477,7 @@
+ 
+   for (const { model, maxTokens, mode, timeoutMs } of GEMINI_MODEL_CHAIN) {
+     let retriesLeft = RATE_LIMIT_MAX_RETRIES;
++    let overloadRetriesLeft = OVERLOAD_MAX_RETRIES;
+ 
+     // eslint-disable-next-line no-constant-condition
+     while (true) {
+@@ -468,6 +559,21 @@
+           }
+         }
+ 
++        // 503 "high demand ... spikes are usually temporary": thường tự hết sau vài giây.
++        // Retry NGẮN 1 lần trên cùng model (nếu còn ngân sách) trước khi bỏ — ngân sách
++        // thực tế đang dư lớn (log: chỉ dùng 16s/50s). Chỉ 1 lần để không ăn hết deadline.
++        if (overloadRetriesLeft > 0 && isOverloadError(err)) {
++          const stillViable = clampAttemptTimeout(deadline, OVERLOAD_RETRY_DELAY_MS + MIN_VIABLE_ATTEMPT_MS) !== null;
++          if (stillViable) {
++            overloadRetriesLeft -= 1;
++            console.warn(
++              `⚠️ [gemini/${taskType}] Model ${model} quá tải (503), đợi ${OVERLOAD_RETRY_DELAY_MS}ms rồi thử lại cùng model...`,
++            );
++            await sleep(OVERLOAD_RETRY_DELAY_MS);
++            continue;
++          }
++        }
++
+         console.warn(
+           `⚠️ [gemini/${taskType}] Model ${model} thất bại (${describeError(err)}), thử model kế tiếp...`,
+         );
+@@ -509,7 +615,11 @@
+       const geminiMsg = geminiError instanceof Error ? geminiError.message : String(geminiError);
+       const groqMsg = groqError instanceof Error ? groqError.message : String(groqError);
+ 
+-      throw new Error(`Tất cả AI Providers đều thất bại!\n- Gemini: ${geminiMsg}\n- Groq: ${groqMsg}`);
++      throw new AllProvidersFailedError(
++        `Tất cả AI Providers đều thất bại!\n- Gemini: ${geminiMsg}\n- Groq: ${groqMsg}`,
++        geminiError,
++        groqError,
++      );
+     }
+   }
+ }
+\ No newline at end of file

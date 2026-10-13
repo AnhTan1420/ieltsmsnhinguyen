@@ -76,7 +76,45 @@ export function parseSubmissionContent(raw: string | null | undefined) {
 // ─────────────────────────────────────────────────────────────
 
 /** JSON không parse được sau mọi nỗ lực sửa — coi là lỗi "đáng thử model khác", không phải lỗi hệ thống */
-export class JsonExtractionError extends Error { }
+export class JsonExtractionError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JsonExtractionError";
+  }
+}
+
+/**
+ * Ném ra khi CẢ Gemini lẫn Groq đều thất bại. Là lỗi có kiểu (typed) để route
+ * phân loại 503 (AI quá tải/hết lượt — thử lại sau được) vs 502 (lỗi hệ thống
+ * thật) bằng `instanceof` thay vì regex trên chuỗi message: regex cũ không
+ * khớp "high demand"/"UNAVAILABLE"/"json_validate_failed" nên một sự cố quá
+ * tải thuần tuý của AI bị trả nhầm thành 502 "lỗi hệ thống nghiêm trọng".
+ */
+export class AllProvidersFailedError extends Error {
+  readonly geminiError: unknown;
+  readonly groqError: unknown;
+  constructor(message: string, geminiError: unknown, groqError: unknown) {
+    super(message);
+    this.name = "AllProvidersFailedError";
+    this.geminiError = geminiError;
+    this.groqError = groqError;
+  }
+}
+
+/** 503 / UNAVAILABLE / "high demand" — quá tải tạm thời phía provider, hay tự hết sau vài giây. */
+export function isOverloadError(err: any): boolean {
+  const status = err?.status ?? err?.response?.status ?? err?.code;
+  if (status === 503 || status === "UNAVAILABLE") return true;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return msg.includes("unavailable") || msg.includes("high demand") || msg.includes("overloaded");
+}
+
+/** Lỗi nào của AI đáng trả 503 "thử lại sau" cho người dùng (thay vì 502 lỗi hệ thống). */
+export function isAIOverloadError(err: unknown): boolean {
+  if (err instanceof AllProvidersFailedError) return true;
+  const msg = err instanceof Error ? err.message : String(err);
+  return /429|503|413|rate limit|quota|exceeded|unavailable|high demand|overloaded|too large|json_validate_failed|timed out|timeout|aborted|hết ngân sách|quá tải/i.test(msg);
+}
 
 function toHalfBand(x: number): number {
   return Math.round(Math.min(Math.max(x, 1), 9) * 2) / 2;
@@ -230,6 +268,12 @@ export function isFallbackWorthyError(err: any): boolean {
 
   const msg = String(err?.message ?? "").toLowerCase();
   return (
+    // Groq 400 `json_validate_failed`: model (đặc biệt gpt-oss — reasoning model)
+    // tiêu hết max_tokens cho phần suy luận ẩn nên content rỗng/cụt → Groq tự
+    // validate JSON và từ chối. Đây là lỗi RIÊNG CỦA MODEL/lượt gọi, không phải
+    // lỗi input của mình → phải được phép thử model/provider khác, không throw.
+    msg.includes("json_validate_failed") ||
+    msg.includes("failed to validate json") ||
     msg.includes("rate_limit") ||
     msg.includes("quota") ||
     msg.includes("too large") ||
