@@ -379,7 +379,7 @@ async function gradeWithGroq(
 // ─────────────────────────────────────────────────────────────
 const GEMINI_MODEL_CHAIN: readonly ModelChainConfig[] = Object.freeze([
   {
-    model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash",
+    model: process.env.GEMINI_MODEL ?? "gemini-3.5-flash-lite",
     maxTokens: 4096,
     mode: "full",
     timeoutMs: 40_000, // 40s — nới từ 30s vì gặp 504 thật từ Google (không phải do abort của mình) khi model cần hơn 30s để trả lời; xem chi tiết đánh đổi ngân sách ở comment DEFAULT_BUDGET_MS phía trên.
@@ -394,10 +394,10 @@ const GEMINI_MODEL_CHAIN: readonly ModelChainConfig[] = Object.freeze([
   // 3.5-flash lẫn 3.5-flash-lite đều 503 cùng lúc — cùng họ 3.5 nên cùng chịu 1 đợt
   // quá tải. Thêm 1 model họ khác làm lưới an toàn trước khi rớt xuống Groq (vốn yếu
   // hơn nhiều về chất lượng chấm). Đổi/tắt qua GEMINI_FALLBACK_MODEL ("" = tắt).
-  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3-flash-preview")
+  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.5-flash-lite")
     ? [
         {
-          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3-flash-preview",
+          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.5-flash-lite",
           maxTokens: 4096,
           mode: "compact" as const,
           timeoutMs: 15_000,

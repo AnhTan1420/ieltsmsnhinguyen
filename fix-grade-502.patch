@@ -50,7 +50,7 @@ diff -ruN a/src/lib/grading/index.ts ieltsmsnhinguyen-main/src/lib/grading/index
 +export { AllProvidersFailedError, isAIOverloadError } from "./parse";
 diff -ruN a/src/lib/grading/parse.ts ieltsmsnhinguyen-main/src/lib/grading/parse.ts
 --- a/src/lib/grading/parse.ts	2026-10-13 12:44:05.000000000 +0000
-+++ b/src/lib/grading/parse.ts	2026-10-13 14:05:05.802736826 +0000
++++ b/src/lib/grading/parse.ts	2026-10-13 14:20:34.427215153 +0000
 @@ -76,7 +76,45 @@
  // ─────────────────────────────────────────────────────────────
  
@@ -98,9 +98,25 @@ diff -ruN a/src/lib/grading/parse.ts ieltsmsnhinguyen-main/src/lib/grading/parse
  
  function toHalfBand(x: number): number {
    return Math.round(Math.min(Math.max(x, 1), 9) * 2) / 2;
-@@ -230,6 +268,12 @@
+@@ -229,7 +267,28 @@
+   if (err?.name === "AbortError") return true;
  
    const msg = String(err?.message ?? "").toLowerCase();
++
++  // Model bị ngừng cấp / đổi tên / không tồn tại (404 NOT_FOUND, "no longer available
++  // to new users", Groq "model_not_found"): lỗi RIÊNG CỦA MODEL trong chain, không phải
++  // lỗi input. Nếu throw thẳng, nó cắt đứt cả chain và che mất nguyên nhân thật của
++  // các model trước đó (vd 503). Cho phép nhảy sang model kế tiếp.
++  if (
++    status === 404 ||
++    status === "NOT_FOUND" ||
++    msg.includes("no longer available") ||
++    msg.includes("model_not_found") ||
++    msg.includes("is not found for api version")
++  ) {
++    return true;
++  }
++
    return (
 +    // Groq 400 `json_validate_failed`: model (đặc biệt gpt-oss — reasoning model)
 +    // tiêu hết max_tokens cho phần suy luận ẩn nên content rỗng/cụt → Groq tự
@@ -113,7 +129,7 @@ diff -ruN a/src/lib/grading/parse.ts ieltsmsnhinguyen-main/src/lib/grading/parse
      msg.includes("too large") ||
 diff -ruN a/src/lib/grading/provider.ts ieltsmsnhinguyen-main/src/lib/grading/provider.ts
 --- a/src/lib/grading/provider.ts	2026-10-13 12:44:05.000000000 +0000
-+++ b/src/lib/grading/provider.ts	2026-10-13 14:05:46.400179869 +0000
++++ b/src/lib/grading/provider.ts	2026-10-13 14:20:34.426046164 +0000
 @@ -4,7 +4,13 @@
  import type { TaskType, PromptMode } from "./prompt";
  import { buildSystemPrompt } from "./prompt";
@@ -293,12 +309,12 @@ diff -ruN a/src/lib/grading/provider.ts ieltsmsnhinguyen-main/src/lib/grading/pr
    },
 +  // Model thứ 3 thuộc HỌ KHÁC (pool capacity riêng). Log 13/10/2026: cả
 +  // 3.5-flash lẫn 3.5-flash-lite đều 503 cùng lúc — cùng họ 3.5 nên cùng chịu 1 đợt
-+  // quá tải. Thêm 1 model họ khác làm lưới an toàn trước khi rớt xuống Groq (vốn yếu
++  // quá tải. Thêm 1 model khác (3.8-flash — gemini-2.5-flash đã bị Google ngừng cấp cho user mới, trả 404 "no longer available") làm lưới an toàn trước khi rớt xuống Groq (vốn yếu
 +  // hơn nhiều về chất lượng chấm). Đổi/tắt qua GEMINI_FALLBACK_MODEL ("" = tắt).
-+  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash")
++  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.8-flash")
 +    ? [
 +        {
-+          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash",
++          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3.8-flash",
 +          maxTokens: 4096,
 +          mode: "compact" as const,
 +          timeoutMs: 15_000,
