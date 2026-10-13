@@ -267,6 +267,21 @@ export function isFallbackWorthyError(err: any): boolean {
   if (err?.name === "AbortError") return true;
 
   const msg = String(err?.message ?? "").toLowerCase();
+
+  // Model bị ngừng cấp / đổi tên / không tồn tại (404 NOT_FOUND, "no longer available
+  // to new users", Groq "model_not_found"): lỗi RIÊNG CỦA MODEL trong chain, không phải
+  // lỗi input. Nếu throw thẳng, nó cắt đứt cả chain và che mất nguyên nhân thật của
+  // các model trước đó (vd 503). Cho phép nhảy sang model kế tiếp.
+  if (
+    status === 404 ||
+    status === "NOT_FOUND" ||
+    msg.includes("no longer available") ||
+    msg.includes("model_not_found") ||
+    msg.includes("is not found for api version")
+  ) {
+    return true;
+  }
+
   return (
     // Groq 400 `json_validate_failed`: model (đặc biệt gpt-oss — reasoning model)
     // tiêu hết max_tokens cho phần suy luận ẩn nên content rỗng/cụt → Groq tự

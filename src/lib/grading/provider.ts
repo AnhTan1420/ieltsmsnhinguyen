@@ -394,10 +394,10 @@ const GEMINI_MODEL_CHAIN: readonly ModelChainConfig[] = Object.freeze([
   // 3.5-flash lẫn 3.5-flash-lite đều 503 cùng lúc — cùng họ 3.5 nên cùng chịu 1 đợt
   // quá tải. Thêm 1 model họ khác làm lưới an toàn trước khi rớt xuống Groq (vốn yếu
   // hơn nhiều về chất lượng chấm). Đổi/tắt qua GEMINI_FALLBACK_MODEL ("" = tắt).
-  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash")
+  ...((process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3-flash-preview")
     ? [
         {
-          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-2.5-flash",
+          model: process.env.GEMINI_FALLBACK_MODEL ?? "gemini-3-flash-preview",
           maxTokens: 4096,
           mode: "compact" as const,
           timeoutMs: 15_000,
@@ -555,6 +555,21 @@ async function gradeWithGemini(
               `⚠️ [gemini/${taskType}] Model ${model} bị rate limit (429), đợi ${waitMs}ms${suggestedMs !== null ? " (theo retryDelay Google gợi ý)" : ""} rồi thử lại cùng model...`,
             );
             await sleep(waitMs);
+            continue;
+          }
+        }
+
+        // 503 "high demand ... spikes are usually temporary": thường tự hết sau vài giây.
+        // Retry NGẮN 1 lần trên cùng model (nếu còn ngân sách) trước khi bỏ — ngân sách
+        // thực tế đang dư lớn (log: chỉ dùng 16s/50s). Chỉ 1 lần để không ăn hết deadline.
+        if (overloadRetriesLeft > 0 && isOverloadError(err)) {
+          const stillViable = clampAttemptTimeout(deadline, OVERLOAD_RETRY_DELAY_MS + MIN_VIABLE_ATTEMPT_MS) !== null;
+          if (stillViable) {
+            overloadRetriesLeft -= 1;
+            console.warn(
+              `⚠️ [gemini/${taskType}] Model ${model} quá tải (503), đợi ${OVERLOAD_RETRY_DELAY_MS}ms rồi thử lại cùng model...`,
+            );
+            await sleep(OVERLOAD_RETRY_DELAY_MS);
             continue;
           }
         }
